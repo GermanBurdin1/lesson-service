@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { LessonsModule } from './lessons/lessons.module';
+import { Lesson } from './lessons/lesson.entity';
 
 @Module({
 	imports: [
@@ -17,9 +18,9 @@ import { LessonsModule } from './lessons/lessons.module';
 				username: config.get<string>('DB_USERNAME'),
 				password: config.get<string>('DB_PASSWORD'),
 				database: config.get<string>('DB_NAME'),
-				entities: [],
+				entities: [Lesson],
 				migrations: ['dist/migrations/*.js'],
-				synchronize: false,
+				synchronize: true,
 			}),
 		}),
 		LessonsModule
