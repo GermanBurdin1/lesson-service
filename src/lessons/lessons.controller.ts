@@ -10,6 +10,14 @@ export class LessonsController {
 		return this.lessonsService.bookLesson(body.studentId, body.teacherId, new Date(body.scheduledAt));
 	}
 
+	@Post('respond')
+	async respondToBooking(@Body() body: { lessonId: string, accepted: boolean, reason?: string }) {
+		console.log(`📥 [POST] /respond reçu:`, body);
+		return this.lessonsService.respondToBooking(body.lessonId, body.accepted, body.reason);
+	}
+
+
+
 	@Get()
 	getUserLessons(@Query('userId') userId: string) {
 		return this.lessonsService.getLessonsForUser(userId);
