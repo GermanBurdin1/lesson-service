@@ -25,9 +25,8 @@ export class LessonsController {
 
 	@Get('student/:id/confirmed-lessons')
 	async getConfirmedLessons(@Param('id') studentId: string) {
+		console.log(`📥 [GET] /student/${studentId}/confirmed-lessons reçu`);
 		return this.lessonsService.getLessonsForStudent(studentId, 'confirmed');
 	}
-
-
 
 }

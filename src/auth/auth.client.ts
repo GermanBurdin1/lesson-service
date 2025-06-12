@@ -8,7 +8,7 @@ export class AuthClient {
 
   async getUserInfo(userId: string): Promise<{ id: string; name: string; surname: string }> {
   console.log('📘 [auth] getUser запрос для id:', userId);
-  const url = `http://auth-service:3001/auth/users/${userId}`; // 👈 без /auth
+  const url = `http://auth-service:3001/auth/users/${userId}`; 
   const { data } = await firstValueFrom(this.http.get(url));
   return data;
 }

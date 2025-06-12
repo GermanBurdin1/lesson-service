@@ -102,6 +102,7 @@ export class LessonsService {
 
 		const withTeacherNames = await Promise.all(lessons.map(async (lesson) => {
 			const teacher = await this.authClient.getUserInfo(lesson.teacherId);
+			console.log('👤 Teacher info:', teacher);
 			return {
 				...lesson,
 				teacherName: `${teacher.name} ${teacher.surname}`,
