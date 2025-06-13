@@ -6,13 +6,18 @@ import { LessonsController } from './lessons.controller';
 import { RabbitMQModule } from '@golevelup/nestjs-rabbitmq';
 import { AuthClient } from '../auth/auth.client';
 import { HttpModule } from '@nestjs/axios';
+import * as dotenv from 'dotenv';
+
+dotenv.config(); 
+
 
 @Module({
 	imports: [
 		TypeOrmModule.forFeature([Lesson]),
 		HttpModule,
 		RabbitMQModule.forRoot(RabbitMQModule, {
-			uri: 'amqp://guest:guest@rabbitmq:5672',
+			// uri: 'amqp://guest:guest@rabbitmq:5672', // pour docker
+			uri: `amqp://${process.env.RABBITMQ_USER}:${process.env.RABBITMQ_PASSWORD}@${process.env.RABBITMQ_HOST}:${process.env.RABBITMQ_PORT}`, // pour localhost
 			exchanges: [{ name: 'lesson_exchange', type: 'direct' }],
 		}),
 	],

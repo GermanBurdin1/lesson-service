@@ -7,8 +7,9 @@ export class AuthClient {
   constructor(private readonly http: HttpService) {}
 
   async getUserInfo(userId: string): Promise<{ id: string; name: string; surname: string }> {
-  console.log('📘 [auth] getUser запрос для id:', userId);
-  const url = `http://auth-service:3001/auth/users/${userId}`; 
+  console.log('📘 [auth] getUser requête pour l\' id:', userId);
+  // const url = `http://auth-service:3001/auth/users/${userId}`; // docker
+	const url = `${process.env.AUTH_SERVICE_URL}/auth/users/${userId}`;
   const { data } = await firstValueFrom(this.http.get(url));
   return data;
 }
