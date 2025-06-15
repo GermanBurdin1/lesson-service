@@ -112,4 +112,30 @@ export class LessonsService {
 		return withTeacherNames;
 	}
 
+	async getTeachersForStudent(studentId: string): Promise<any[]> {
+		console.log('[LessonsService] getTeachersForStudent called with studentId:', studentId);
+		const lessons = await this.lessonRepo.find({
+			where: [
+				{ studentId, status: 'confirmed' },
+				{ studentId, status: 'pending' }
+			],
+			order: { scheduledAt: 'ASC' }
+		});
+		console.log('[LessonsService] Найденные уроки:', lessons);
+		const uniqueTeacherIds = Array.from(new Set(lessons.map(l => l.teacherId)));
+		console.log('[LessonsService] Уникальные teacherId:', uniqueTeacherIds);
+		const teachers = await Promise.all(
+			uniqueTeacherIds.map(async (teacherId) => {
+				const teacher = await this.authClient.getUserInfo(teacherId);
+				console.log('[LessonsService] teacher info:', teacher);
+				return {
+					id: teacherId,
+					name: `${teacher.name} ${teacher.surname}`
+				};
+			})
+		);
+		console.log('[LessonsService] Возвращаемые преподаватели:', teachers);
+		return teachers;
+	}
+
 }

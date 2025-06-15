@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Query, Param } from '@nestjs/common';
+import { Controller, Post, Body, Get, Query, Param, Logger } from '@nestjs/common';
 import { LessonsService } from './lessons.service';
 
 @Controller('lessons')
@@ -16,8 +16,6 @@ export class LessonsController {
 		return this.lessonsService.respondToBooking(body.lessonId, body.accepted, body.reason);
 	}
 
-
-
 	@Get()
 	getUserLessons(@Query('userId') userId: string) {
 		return this.lessonsService.getLessonsForUser(userId);
@@ -27,6 +25,12 @@ export class LessonsController {
 	async getConfirmedLessons(@Param('id') studentId: string) {
 		console.log(`📥 [GET] /student/${studentId}/confirmed-lessons reçu`);
 		return this.lessonsService.getLessonsForStudent(studentId, 'confirmed');
+	}
+
+	@Get('student/:id/teachers')
+	async getTeachersForStudent(@Param('id') studentId: string) {
+		Logger.log(`[LessonsController] getTeachersForStudent вызван для studentId: ${studentId}`);
+		return this.lessonsService.getTeachersForStudent(studentId);
 	}
 
 }
