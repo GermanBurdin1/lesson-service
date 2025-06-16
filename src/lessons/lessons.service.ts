@@ -126,11 +126,19 @@ export class LessonsService {
 		console.log('[LessonsService] Уникальные teacherId:', uniqueTeacherIds);
 		const teachers = await Promise.all(
 			uniqueTeacherIds.map(async (teacherId) => {
-				const teacher = await this.authClient.getUserInfo(teacherId);
-				console.log('[LessonsService] teacher info:', teacher);
+				const teacher = await this.authClient.getTeacherFullProfile(teacherId);
+				console.log('[LessonsService] teacher full profile:', teacher);
 				return {
 					id: teacherId,
-					name: `${teacher.name} ${teacher.surname}`
+					name: `${teacher.user?.name ?? ''} ${teacher.user?.surname ?? ''}`.trim() || teacher.user?.email,
+					photoUrl: teacher.photo_url || 'assets/default-avatar.png',
+					specializations: teacher.specializations ?? [],
+					price: teacher.price ?? 0,
+					rating: teacher.rating ?? 0,
+					experienceYears: teacher.experience_years ?? 0,
+					reviewCount: teacher.review_count ?? 0,
+					bio: teacher.bio ?? '',
+					certificates: teacher.certificates ?? [],
 				};
 			})
 		);
