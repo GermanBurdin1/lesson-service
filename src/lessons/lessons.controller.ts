@@ -33,4 +33,12 @@ export class LessonsController {
 		return this.lessonsService.getTeachersForStudent(studentId);
 	}
 
+	@Get('teacher/:teacherId/confirmed-students')
+	async getConfirmedStudentsForTeacher(@Param('teacherId') teacherId: string) {
+		console.log('[LESSON CONTROLLER] GET /teacher/:teacherId/confirmed-students called with teacherId:', teacherId);
+		const students = await this.lessonsService.getConfirmedStudentsForTeacher(teacherId);
+		console.log('[LESSON CONTROLLER] Returning students:', students);
+		return students;
+	}
+
 }

@@ -149,4 +149,30 @@ export class LessonsService {
 		return teachers;
 	}
 
+	async getConfirmedStudentsForTeacher(teacherId: string): Promise<any[]> {
+		console.log('[LESSON SERVICE] getConfirmedStudentsForTeacher called with teacherId:', teacherId);
+		const lessons = await this.lessonRepo.find({
+			where: { teacherId, status: 'confirmed' },
+			order: { scheduledAt: 'ASC' }
+		});
+		const uniqueStudentIds = Array.from(new Set(lessons.map(l => l.studentId)));
+		const students = await Promise.all(
+			uniqueStudentIds.map(async (studentId) => {
+				const student = await this.authClient.getUserInfo(studentId);
+				const studentLessons = lessons.filter(l => l.studentId === studentId);
+				const nextLesson = studentLessons.length > 0 ? studentLessons[0] : null;
+				return {
+					id: studentId,
+					name: `${student.name ?? ''} ${student.surname ?? ''}`.trim(),
+					photoUrl: student.photo_url || undefined,
+					isStudent: true,
+					nextLessonDate: nextLesson ? nextLesson.scheduledAt : null,
+					// goals, homework, history, message — если появятся
+				};
+			})
+		);
+		console.log('[LESSON SERVICE] getConfirmedStudentsForTeacher result:', students);
+		return students;
+	}
+
 }
