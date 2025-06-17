@@ -58,11 +58,13 @@ export class LessonsService {
 			throw new Error('Leçon introuvable');
 		}
 
-		console.log(`✅ Leçon trouvée: ${lessonId}, mise à jour du statut...`);
 		lesson.status = accepted ? 'confirmed' : 'rejected';
 		await this.lessonRepo.save(lesson);
-		console.log(`💾 Statut mis à jour: ${lesson.status}`);
 
+		const teacher = await this.authClient.getUserInfo(lesson.teacherId);
+		console.log('[respondToBooking] teacher from authClient:', teacher);
+		const teacherName = `${teacher?.name ?? ''} ${teacher?.surname ?? ''}`.trim();
+		console.log('[LessonsService]teacherName:', teacherName);
 		const payload = {
 			user_id: lesson.studentId,
 			title: accepted ? 'Votre leçon a été confirmée !' : 'Votre demande a été refusée',
@@ -73,6 +75,7 @@ export class LessonsService {
 			metadata: {
 				lessonId: lesson.id,
 				teacherId: lesson.teacherId,
+				teacherName,
 				scheduledAt: lesson.scheduledAt,
 				accepted,
 			},
@@ -81,7 +84,7 @@ export class LessonsService {
 
 		console.debug('📦 Envoi du payload à RabbitMQ:', JSON.stringify(payload, null, 2));
 		await this.amqp.publish('lesson_exchange', 'lesson_response', payload);
-		console.log('📤 Message publié sur lesson_exchange avec routingKey=lesson_response');
+		//console.log('📤 Message publié sur lesson_exchange avec routingKey=lesson_response');
 
 		return { success: true };
 	}
@@ -102,7 +105,7 @@ export class LessonsService {
 
 		const withTeacherNames = await Promise.all(lessons.map(async (lesson) => {
 			const teacher = await this.authClient.getUserInfo(lesson.teacherId);
-			console.log('👤 Teacher info:', teacher);
+			//console.log('👤 Teacher info:', teacher);
 			return {
 				...lesson,
 				teacherName: `${teacher.name} ${teacher.surname}`,
@@ -113,7 +116,7 @@ export class LessonsService {
 	}
 
 	async getTeachersForStudent(studentId: string): Promise<any[]> {
-		console.log('[LessonsService] getTeachersForStudent called with studentId:', studentId);
+		//console.log('[LessonsService] getTeachersForStudent called with studentId:', studentId);
 		const lessons = await this.lessonRepo.find({
 			where: [
 				{ studentId, status: 'confirmed' },
@@ -121,13 +124,13 @@ export class LessonsService {
 			],
 			order: { scheduledAt: 'ASC' }
 		});
-		console.log('[LessonsService] Найденные уроки:', lessons);
+		//console.log('[LessonsService] Найденные уроки:', lessons);
 		const uniqueTeacherIds = Array.from(new Set(lessons.map(l => l.teacherId)));
-		console.log('[LessonsService] Уникальные teacherId:', uniqueTeacherIds);
+		//console.log('[LessonsService] Уникальные teacherId:', uniqueTeacherIds);
 		const teachers = await Promise.all(
 			uniqueTeacherIds.map(async (teacherId) => {
 				const teacher = await this.authClient.getTeacherFullProfile(teacherId);
-				console.log('[LessonsService] teacher full profile:', teacher);
+				//console.log('[LessonsService] teacher full profile:', teacher);
 				return {
 					id: teacherId,
 					name: `${teacher.user?.name ?? ''} ${teacher.user?.surname ?? ''}`.trim() || teacher.user?.email,
@@ -142,7 +145,7 @@ export class LessonsService {
 				};
 			})
 		);
-		console.log('[LessonsService] Возвращаемые преподаватели:', teachers);
+		//console.log('[LessonsService] Возвращаемые преподаватели:', teachers);
 		return teachers;
 	}
 
