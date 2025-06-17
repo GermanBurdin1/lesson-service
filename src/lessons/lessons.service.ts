@@ -24,18 +24,23 @@ export class LessonsService {
 
 		const savedLesson = await this.lessonRepo.save(lesson);
 
+		// Получаем имя и фамилию студента
+		const student = await this.authClient.getUserInfo(studentId);
+		const studentFullName = `${student.name ?? ''} ${student.surname ?? ''}`.trim();
+
 		const date = scheduledAt.toLocaleDateString('fr-FR');
 		const time = scheduledAt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
 		const payload = {
 			user_id: teacherId,
-			title: 'Nouvelle demande de réservation',
-			message: `Un étudiant souhaite réserver un cours le ${date} à ${time}.`,
+			title: `Nouvelle demande de réservation de ${studentFullName}`,
+			message: `${studentFullName} souhaite réserver un cours le ${date} à ${time}.`,
 			type: 'booking_request',
 			metadata: {
 				lessonId: savedLesson.id,
 				studentId,
 				scheduledAt,
+				studentName: studentFullName,
 			},
 			status: 'pending',
 		};
