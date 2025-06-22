@@ -180,4 +180,19 @@ export class LessonsService {
 		return students;
 	}
 
+	async getAllConfirmedLessonsForTeacher(teacherId: string) {
+		const lessons = await this.lessonRepo.find({
+			where: { teacherId, status: 'confirmed' },
+			order: { scheduledAt: 'ASC' }
+		});
+		// Добавим имя студента к каждому занятию
+		return Promise.all(lessons.map(async (lesson) => {
+			const student = await this.authClient.getUserInfo(lesson.studentId);
+			return {
+				...lesson,
+				studentName: `${student.name ?? ''} ${student.surname ?? ''}`.trim(),
+			};
+		}));
+	}
+
 }

@@ -41,4 +41,9 @@ export class LessonsController {
 		return students;
 	}
 
+	@Get('teacher/:id/confirmed-lessons')
+	async getAllConfirmedLessonsForTeacher(@Param('id') teacherId: string) {
+		return this.lessonsService.getAllConfirmedLessonsForTeacher(teacherId);
+	}
+
 }
