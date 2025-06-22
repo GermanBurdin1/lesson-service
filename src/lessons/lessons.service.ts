@@ -4,6 +4,8 @@ import { Repository } from 'typeorm';
 import { Lesson } from './lesson.entity';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { AuthClient } from '../auth/auth.client';
+import { HttpService } from '@nestjs/axios';
+import { lastValueFrom } from 'rxjs';
 
 @Injectable()
 export class LessonsService {
@@ -12,6 +14,7 @@ export class LessonsService {
 		private lessonRepo: Repository<Lesson>,
 		private readonly amqp: AmqpConnection,
 		private readonly authClient: AuthClient,
+		private readonly httpService: HttpService,
 	) { }
 
 	async bookLesson(studentId: string, teacherId: string, scheduledAt: Date) {
@@ -65,6 +68,30 @@ export class LessonsService {
 
 		lesson.status = accepted ? 'confirmed' : 'rejected';
 		await this.lessonRepo.save(lesson);
+
+		// --- Обновление статуса уведомления ---
+		try {
+			console.log('[LessonService] Ищу notificationId по lessonId:', lessonId);
+			const notifResp = await lastValueFrom(
+				this.httpService.get(`http://localhost:3003/notifications/by-lesson/${lessonId}`)
+			);
+			const notification = notifResp.data;
+			if (notification && notification.id) {
+				console.log('[LessonService] Найден notificationId:', notification.id, '— обновляю статус...');
+				await lastValueFrom(
+					this.httpService.patch(
+						`http://localhost:3003/notifications/${notification.id}`,
+						{ status: accepted ? 'accepted' : 'rejected' }
+					)
+				);
+				console.log('[LessonService] Статус уведомления обновлён!');
+			} else {
+				console.warn('[LessonService] Не найдено уведомление для lessonId:', lessonId);
+			}
+		} catch (err) {
+			console.error('[LessonService] Ошибка при обновлении статуса уведомления:', err);
+		}
+		// --- Конец блока обновления статуса уведомления ---
 
 		const teacher = await this.authClient.getUserInfo(lesson.teacherId);
 		console.log('[respondToBooking] teacher from authClient:', teacher);
