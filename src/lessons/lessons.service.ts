@@ -56,9 +56,15 @@ export class LessonsService {
 		return savedLesson;
 	}
 
-	async respondToBooking(lessonId: string, accepted: boolean, reason?: string) {
+	async respondToBooking(
+		lessonId: string,
+		accepted: boolean,
+		reason?: string,
+		proposeAlternative?: boolean,
+		proposedTime?: string
+	) {
 		console.log(`🔔 [START] Réponse à la demande de leçon (ID=${lessonId})`);
-		console.debug(`📨 Données: accepted=${accepted}, reason="${reason ?? 'N/A'}"`);
+		console.debug(`📨 Données: accepted=${accepted}, reason="${reason ?? 'N/A'}", proposeAlternative=${proposeAlternative}, proposedTime=${proposedTime}`);
 
 		const lesson = await this.lessonRepo.findOneBy({ id: lessonId });
 		if (!lesson) {
@@ -66,7 +72,37 @@ export class LessonsService {
 			throw new Error('Leçon introuvable');
 		}
 
+		if (proposeAlternative && proposedTime) {
+			lesson.proposedByTeacherAt = new Date();
+			lesson.proposedTime = new Date(proposedTime);
+			lesson.status = 'pending';
+			lesson.studentConfirmed = null;
+			lesson.studentRefused = null;
+			await this.lessonRepo.save(lesson);
+			
+			// Получаем информацию о преподавателе для уведомления
+			const teacher = await this.authClient.getUserInfo(lesson.teacherId);
+			const teacherName = `${teacher?.name ?? ''} ${teacher?.surname ?? ''}`.trim();
+			
+			await this.amqp.publish('lesson_exchange', 'lesson_response', {
+				user_id: lesson.studentId,
+				title: 'Le professeur propose un autre horaire',
+				message: `Le professeur propose le ${lesson.proposedTime.toLocaleString('fr-FR')}.`,
+				type: 'booking_proposal',
+				metadata: { 
+					lessonId: lesson.id, 
+					proposedTime: lesson.proposedTime,
+					teacherId: lesson.teacherId,
+					teacherName: teacherName
+				},
+				status: 'unread',
+			});
+			return { success: true, proposal: true };
+		}
+
 		lesson.status = accepted ? 'confirmed' : 'rejected';
+		lesson.studentConfirmed = accepted;
+		lesson.studentRefused = !accepted;
 		await this.lessonRepo.save(lesson);
 
 		// --- Обновление статуса уведомления ---
@@ -121,6 +157,91 @@ export class LessonsService {
 		return { success: true };
 	}
 
+	async studentRespondToProposal(
+		lessonId: string,
+		accepted: boolean,
+		newSuggestedTime?: string
+	) {
+		const lesson = await this.lessonRepo.findOneBy({ id: lessonId });
+		if (!lesson) throw new Error('Leçon introuvable');
+
+		// --- Обновление статуса уведомления ---
+		try {
+			console.log('[studentRespondToProposal] Ищу уведомление для lessonId:', lessonId);
+			const notifResp = await lastValueFrom(
+				this.httpService.get(`http://localhost:3003/notifications/by-lesson/${lessonId}`)
+			);
+			const notification = notifResp.data;
+			if (notification && notification.id) {
+				console.log('[studentRespondToProposal] Найдено уведомление:', notification.id);
+				// Обновляем data уведомления с accepted/refused статусом
+				const updatedData = {
+					...notification.data,
+					accepted: accepted,
+					refused: !accepted
+				};
+				await lastValueFrom(
+					this.httpService.patch(
+						`http://localhost:3003/notifications/${notification.id}`,
+						{ 
+							status: accepted ? 'accepted' : 'refused',
+							data: updatedData
+						}
+					)
+				);
+				console.log('[studentRespondToProposal] Статус уведомления обновлён!');
+			} else {
+				console.warn('[studentRespondToProposal] Не найдено уведомление для lessonId:', lessonId);
+			}
+		} catch (err) {
+			console.error('[studentRespondToProposal] Ошибка при обновлении статуса уведомления:', err);
+		}
+		// --- Конец блока обновления статуса уведомления ---
+
+		if (accepted) {
+			lesson.status = 'confirmed';
+			lesson.studentConfirmed = true;
+			lesson.studentRefused = false;
+			await this.lessonRepo.save(lesson);
+			await this.amqp.publish('lesson_exchange', 'lesson_response', {
+				user_id: lesson.teacherId,
+				title: "L'élève a accepté la proposition",
+				message: `L'élève a accepté la proposition pour le ${lesson.proposedTime?.toLocaleString('fr-FR')}.`,
+				type: 'booking_proposal_accepted',
+				metadata: { lessonId: lesson.id, proposedTime: lesson.proposedTime },
+				status: 'unread',
+			});
+			return { success: true, accepted: true };
+		} else if (newSuggestedTime) {
+			lesson.studentAlternativeTime = new Date(newSuggestedTime);
+			lesson.studentConfirmed = false;
+			lesson.studentRefused = true;
+			await this.lessonRepo.save(lesson);
+			await this.amqp.publish('lesson_exchange', 'lesson_response', {
+				user_id: lesson.teacherId,
+				title: "L'élève propose un autre horaire",
+				message: `L'élève propose le ${lesson.studentAlternativeTime.toLocaleString('fr-FR')}.`,
+				type: 'booking_proposal_counter',
+				metadata: { lessonId: lesson.id, proposedTime: lesson.studentAlternativeTime },
+				status: 'unread',
+			});
+			return { success: true, counter: true };
+		} else {
+			lesson.status = 'rejected';
+			lesson.studentConfirmed = false;
+			lesson.studentRefused = true;
+			await this.lessonRepo.save(lesson);
+			await this.amqp.publish('lesson_exchange', 'lesson_response', {
+				user_id: lesson.teacherId,
+				title: "L'élève a refusé la proposition",
+				message: `L'élève a refusé la proposition.`,
+				type: 'booking_proposal_refused',
+				metadata: { lessonId: lesson.id },
+				status: 'unread',
+			});
+			return { success: true, refused: true };
+		}
+	}
 
 	async getLessonsForUser(userId: string) {
 		return this.lessonRepo.find({
@@ -131,19 +252,39 @@ export class LessonsService {
 
 	async getLessonsForStudent(studentId: string, status: 'confirmed') {
 		const lessons = await this.lessonRepo.find({
-			where: { studentId, status },
+			where: { studentId },
 			order: { scheduledAt: 'ASC' }
 		});
+		console.log('[getLessonsForStudent] Найдено уроков:', lessons.length, lessons);
 
 		const withTeacherNames = await Promise.all(lessons.map(async (lesson) => {
 			const teacher = await this.authClient.getUserInfo(lesson.teacherId);
-			//console.log('👤 Teacher info:', teacher);
-			return {
+			const base = {
 				...lesson,
-				teacherName: `${teacher.name} ${teacher.surname}`,
+				teacherName: `${teacher.name} ${teacher.surname}`.trim(),
+				teacherId: lesson.teacherId,
 			};
+			if (lesson.proposedTime && lesson.status === 'pending') {
+				const proposal = {
+					...base,
+					proposedTime: lesson.proposedTime,
+					studentConfirmed: lesson.studentConfirmed,
+					studentRefused: lesson.studentRefused,
+					isProposal: true
+				};
+				console.log('[getLessonsForStudent] Proposal lesson:', proposal);
+				return proposal;
+			}
+			// console.log('[getLessonsForStudent] Regular lesson:', base);
+			return base;
 		}));
 
+		if (status === 'confirmed') {
+			const filtered = withTeacherNames.filter(l => l.status === 'confirmed');
+			console.log('[getLessonsForStudent] Возвращаем только confirmed:', filtered);
+			return filtered;
+		}
+		console.log('[getLessonsForStudent] Возвращаем все:', withTeacherNames);
 		return withTeacherNames;
 	}
 
@@ -220,6 +361,22 @@ export class LessonsService {
 				studentName: `${student.name ?? ''} ${student.surname ?? ''}`.trim(),
 			};
 		}));
+	}
+
+	async getLessonById(lessonId: string) {
+		const lesson = await this.lessonRepo.findOneBy({ id: lessonId });
+		if (!lesson) {
+			throw new Error('Урок не найден');
+		}
+
+		// Получаем информацию о преподавателе
+		const teacher = await this.authClient.getUserInfo(lesson.teacherId);
+		const teacherName = `${teacher?.name ?? ''} ${teacher?.surname ?? ''}`.trim();
+
+		return {
+			...lesson,
+			teacherName
+		};
 	}
 
 }

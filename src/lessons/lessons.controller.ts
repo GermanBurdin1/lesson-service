@@ -11,9 +11,24 @@ export class LessonsController {
 	}
 
 	@Post('respond')
-	async respondToBooking(@Body() body: { lessonId: string, accepted: boolean, reason?: string }) {
+	async respondToBooking(@Body() body: { lessonId: string, accepted: boolean, reason?: string, proposeAlternative?: boolean, proposedTime?: string }) {
 		console.log(`📥 [POST] /respond reçu:`, body);
-		return this.lessonsService.respondToBooking(body.lessonId, body.accepted, body.reason);
+		return this.lessonsService.respondToBooking(
+			body.lessonId,
+			body.accepted,
+			body.reason,
+			body.proposeAlternative,
+			body.proposedTime
+		);
+	}
+
+	@Post('student-respond')
+	async studentRespondToProposal(@Body() body: { lessonId: string, accepted: boolean, newSuggestedTime?: string }) {
+		return this.lessonsService.studentRespondToProposal(
+			body.lessonId,
+			body.accepted,
+			body.newSuggestedTime
+		);
 	}
 
 	@Get()
@@ -44,6 +59,11 @@ export class LessonsController {
 	@Get('teacher/:id/confirmed-lessons')
 	async getAllConfirmedLessonsForTeacher(@Param('id') teacherId: string) {
 		return this.lessonsService.getAllConfirmedLessonsForTeacher(teacherId);
+	}
+
+	@Get(':id')
+	async getLessonById(@Param('id') lessonId: string) {
+		return this.lessonsService.getLessonById(lessonId);
 	}
 
 }

@@ -19,4 +19,19 @@ status: 'pending' | 'confirmed' | 'rejected';
 
   @CreateDateColumn()
   createdAt: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
+  proposedByTeacherAt: Date | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  proposedTime: Date | null;
+
+  @Column({ type: 'boolean', nullable: true })
+  studentConfirmed: boolean | null;
+
+  @Column({ type: 'boolean', nullable: true })
+  studentRefused: boolean | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  studentAlternativeTime: Date | null;
 }
