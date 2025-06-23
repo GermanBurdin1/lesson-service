@@ -198,17 +198,27 @@ export class LessonsService {
 		}
 		// --- Конец блока обновления статуса уведомления ---
 
+		// Получаем информацию о студенте один раз для всех случаев
+		const student = await this.authClient.getUserInfo(lesson.studentId);
+		const studentName = `${student?.name ?? ''} ${student?.surname ?? ''}`.trim();
+
 		if (accepted) {
 			lesson.status = 'confirmed';
 			lesson.studentConfirmed = true;
 			lesson.studentRefused = false;
 			await this.lessonRepo.save(lesson);
+			
 			await this.amqp.publish('lesson_exchange', 'lesson_response', {
 				user_id: lesson.teacherId,
-				title: "L'élève a accepté la proposition",
-				message: `L'élève a accepté la proposition pour le ${lesson.proposedTime?.toLocaleString('fr-FR')}.`,
+				title: `${studentName} a accepté la proposition`,
+				message: `${studentName} a accepté la proposition pour le ${lesson.proposedTime?.toLocaleString('fr-FR')}.`,
 				type: 'booking_proposal_accepted',
-				metadata: { lessonId: lesson.id, proposedTime: lesson.proposedTime },
+				metadata: { 
+					lessonId: lesson.id, 
+					proposedTime: lesson.proposedTime,
+					studentId: lesson.studentId,
+					studentName: studentName
+				},
 				status: 'unread',
 			});
 			return { success: true, accepted: true };
@@ -217,12 +227,18 @@ export class LessonsService {
 			lesson.studentConfirmed = false;
 			lesson.studentRefused = true;
 			await this.lessonRepo.save(lesson);
+			
 			await this.amqp.publish('lesson_exchange', 'lesson_response', {
 				user_id: lesson.teacherId,
-				title: "L'élève propose un autre horaire",
-				message: `L'élève propose le ${lesson.studentAlternativeTime.toLocaleString('fr-FR')}.`,
+				title: `${studentName} propose un autre horaire`,
+				message: `${studentName} propose le ${lesson.studentAlternativeTime.toLocaleString('fr-FR')}.`,
 				type: 'booking_proposal_counter',
-				metadata: { lessonId: lesson.id, proposedTime: lesson.studentAlternativeTime },
+				metadata: { 
+					lessonId: lesson.id, 
+					proposedTime: lesson.studentAlternativeTime,
+					studentId: lesson.studentId,
+					studentName: studentName
+				},
 				status: 'unread',
 			});
 			return { success: true, counter: true };
@@ -231,12 +247,17 @@ export class LessonsService {
 			lesson.studentConfirmed = false;
 			lesson.studentRefused = true;
 			await this.lessonRepo.save(lesson);
+			
 			await this.amqp.publish('lesson_exchange', 'lesson_response', {
 				user_id: lesson.teacherId,
-				title: "L'élève a refusé la proposition",
-				message: `L'élève a refusé la proposition.`,
+				title: `${studentName} a refusé la proposition`,
+				message: `${studentName} a refusé la proposition.`,
 				type: 'booking_proposal_refused',
-				metadata: { lessonId: lesson.id },
+				metadata: { 
+					lessonId: lesson.id,
+					studentId: lesson.studentId,
+					studentName: studentName
+				},
 				status: 'unread',
 			});
 			return { success: true, refused: true };
