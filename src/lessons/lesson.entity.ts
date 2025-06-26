@@ -14,8 +14,8 @@ export class Lesson {
   @Column('timestamp')
   scheduledAt: Date;
 
-  @Column({ type: 'enum', enum: ['pending', 'confirmed', 'rejected'], default: 'pending' })
-status: 'pending' | 'confirmed' | 'rejected';
+  @Column({ type: 'enum', enum: ['pending', 'confirmed', 'rejected', 'cancelled_by_student', 'cancelled_by_student_no_refund', 'in_progress', 'completed'], default: 'pending' })
+  status: 'pending' | 'confirmed' | 'rejected' | 'cancelled_by_student' | 'cancelled_by_student_no_refund' | 'in_progress' | 'completed';
 
   @CreateDateColumn()
   createdAt: Date;
@@ -34,4 +34,26 @@ status: 'pending' | 'confirmed' | 'rejected';
 
   @Column({ type: 'timestamp', nullable: true })
   studentAlternativeTime: Date | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  cancelledAt: Date | null;
+
+  @Column({ type: 'text', nullable: true })
+  cancellationReason: string | null;
+
+  // Новые поля для отслеживания начала занятия
+  @Column({ type: 'timestamp', nullable: true })
+  startedAt: Date | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  endedAt: Date | null;
+
+  @Column({ type: 'boolean', default: false })
+  videoCallStarted: boolean;
+
+  @Column({ type: 'uuid', nullable: true })
+  startedBy: string | null; // кто запустил видеосвязь
+
+  // Связи с задачами и вопросами
+  // Удаляем прямые связи - они будут через foreign key
 }

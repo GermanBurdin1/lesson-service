@@ -66,4 +66,78 @@ export class LessonsController {
 		return this.lessonsService.getLessonById(lessonId);
 	}
 
+	@Post('cancel')
+	async cancelLessonByStudent(@Body() body: { lessonId: string, reason: string }) {
+		console.log(`📥 [POST] /cancel получен:`, body);
+		return this.lessonsService.cancelLessonByStudent(body.lessonId, body.reason);
+	}
+
+	// ==================== НОВЫЕ ЭНДПОИНТЫ ДЛЯ РАБОТЫ С ЗАДАЧАМИ, ВОПРОСАМИ И НАЧАЛОМ УРОКА ====================
+
+	@Post('start')
+	async startLesson(@Body() body: { lessonId: string, startedBy: string }) {
+		console.log(`📥 [POST] /start получен:`, body);
+		return this.lessonsService.startLesson(body.lessonId, body.startedBy);
+	}
+
+	@Post('end')
+	async endLesson(@Body() body: { lessonId: string, endedBy: string }) {
+		console.log(`📥 [POST] /end получен:`, body);
+		return this.lessonsService.endLesson(body.lessonId, body.endedBy);
+	}
+
+	@Get(':id/details')
+	async getLessonWithTasksAndQuestions(@Param('id') lessonId: string) {
+		return this.lessonsService.getLessonWithTasksAndQuestions(lessonId);
+	}
+
+	@Post('tasks')
+	async addTaskToLesson(@Body() body: { lessonId: string, title: string, description?: string, createdBy: string, createdByRole: 'student' | 'teacher' }) {
+		console.log(`📥 [POST] /tasks получен:`, body);
+		return this.lessonsService.addTaskToLesson(
+			body.lessonId,
+			body.title,
+			body.description || null,
+			body.createdBy,
+			body.createdByRole
+		);
+	}
+
+	@Post('questions')
+	async addQuestionToLesson(@Body() body: { lessonId: string, question: string, createdBy: string, createdByRole: 'student' | 'teacher' }) {
+		console.log(`📥 [POST] /questions получен:`, body);
+		return this.lessonsService.addQuestionToLesson(
+			body.lessonId,
+			body.question,
+			body.createdBy,
+			body.createdByRole
+		);
+	}
+
+	@Post('tasks/:taskId/complete')
+	async completeTask(@Param('taskId') taskId: string, @Body() body: { completedBy: string }) {
+		return this.lessonsService.completeTask(taskId, body.completedBy);
+	}
+
+	@Post('questions/:questionId/answer')
+	async answerQuestion(@Param('questionId') questionId: string, @Body() body: { answer: string, answeredBy: string }) {
+		return this.lessonsService.answerQuestion(questionId, body.answer, body.answeredBy);
+	}
+
+	@Get(':id/tasks')
+	async getTasksForLesson(@Param('id') lessonId: string) {
+		return this.lessonsService.getTasksForLesson(lessonId);
+	}
+
+	@Get(':id/questions')
+	async getQuestionsForLesson(@Param('id') lessonId: string) {
+		return this.lessonsService.getQuestionsForLesson(lessonId);
+	}
+
+	@Get('student/:studentId/sent-requests')
+	async getStudentSentRequests(@Param('studentId') studentId: string) {
+		console.log(`📥 [GET] /student/:studentId/sent-requests получен для studentId: ${studentId}`);
+		return this.lessonsService.getStudentSentRequests(studentId);
+	}
+
 }
