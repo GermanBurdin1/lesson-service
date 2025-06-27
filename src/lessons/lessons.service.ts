@@ -24,6 +24,16 @@ export class LessonsService {
 		private readonly httpService: HttpService,
 	) { }
 
+	// Валидация UUID
+	private validateUUID(id: string): boolean {
+		const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+		return uuidRegex.test(id);
+	}
+
+	private validateUUIDs(...ids: string[]): boolean {
+		return ids.every(id => this.validateUUID(id));
+	}
+
 	async bookLesson(studentId: string, teacherId: string, scheduledAt: Date) {
 		// ==================== ПРОВЕРКА КОНФЛИКТОВ ВРЕМЕНИ ====================
 		console.log(`🔍 Проверка конфликтов для преподавателя ${teacherId} на время ${scheduledAt}`);
@@ -432,6 +442,12 @@ export class LessonsService {
 	}
 
 	async getAllConfirmedLessonsForTeacher(teacherId: string) {
+		// Валидация UUID
+		if (!this.validateUUID(teacherId)) {
+			console.error(`❌ Invalid teacherId UUID format: ${teacherId}`);
+			throw new Error('Invalid teacher ID format');
+		}
+
 		const lessons = await this.lessonRepo.find({
 			where: { 
 				teacherId, 
@@ -450,6 +466,12 @@ export class LessonsService {
 	}
 
 	async getLessonById(lessonId: string) {
+		// Валидация UUID
+		if (!this.validateUUID(lessonId)) {
+			console.error(`❌ Invalid lessonId UUID format: ${lessonId}`);
+			throw new Error('Invalid lesson ID format');
+		}
+
 		const lesson = await this.lessonRepo.findOneBy({ id: lessonId });
 		if (!lesson) {
 			throw new Error('Урок не найден');
@@ -761,6 +783,12 @@ export class LessonsService {
 	
 	async getStudentSentRequests(studentId: string) {
 		console.log(`📋 Получение отправленных заявок для студента ${studentId}`);
+		
+		// Валидация UUID
+		if (!this.validateUUID(studentId)) {
+			console.error(`❌ Invalid studentId UUID format: ${studentId}`);
+			throw new Error('Invalid student ID format');
+		}
 		
 		const lessons = await this.lessonRepo.find({
 			where: { studentId },

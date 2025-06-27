@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Query, Param, Logger } from '@nestjs/common';
+import { Controller, Post, Body, Get, Query, Param, Logger, Put } from '@nestjs/common';
 import { LessonsService } from './lessons.service';
 
 @Controller('lessons')
@@ -36,6 +36,8 @@ export class LessonsController {
 		return this.lessonsService.getLessonsForUser(userId);
 	}
 
+	// ==================== СПЕЦИФИЧНЫЕ ENDPOINTS (должны быть ВЫШЕ общих) ====================
+
 	@Get('student/:id/confirmed-lessons')
 	async getConfirmedLessons(@Param('id') studentId: string) {
 		console.log(`📥 [GET] /student/${studentId}/confirmed-lessons reçu`);
@@ -46,6 +48,12 @@ export class LessonsController {
 	async getTeachersForStudent(@Param('id') studentId: string) {
 		Logger.log(`[LessonsController] getTeachersForStudent вызван для studentId: ${studentId}`);
 		return this.lessonsService.getTeachersForStudent(studentId);
+	}
+
+	@Get('student/:studentId/sent-requests')
+	async getStudentSentRequests(@Param('studentId') studentId: string) {
+		console.log(`📥 [GET] /student/:studentId/sent-requests получен для studentId: ${studentId}`);
+		return this.lessonsService.getStudentSentRequests(studentId);
 	}
 
 	@Get('teacher/:teacherId/confirmed-students')
@@ -59,17 +67,6 @@ export class LessonsController {
 	@Get('teacher/:id/confirmed-lessons')
 	async getAllConfirmedLessonsForTeacher(@Param('id') teacherId: string) {
 		return this.lessonsService.getAllConfirmedLessonsForTeacher(teacherId);
-	}
-
-	@Get(':id')
-	async getLessonById(@Param('id') lessonId: string) {
-		return this.lessonsService.getLessonById(lessonId);
-	}
-
-	@Post('cancel')
-	async cancelLessonByStudent(@Body() body: { lessonId: string, reason: string }) {
-		console.log(`📥 [POST] /cancel получен:`, body);
-		return this.lessonsService.cancelLessonByStudent(body.lessonId, body.reason);
 	}
 
 	// ==================== НОВЫЕ ЭНДПОИНТЫ ДЛЯ РАБОТЫ С ЗАДАЧАМИ, ВОПРОСАМИ И НАЧАЛОМ УРОКА ====================
@@ -86,9 +83,10 @@ export class LessonsController {
 		return this.lessonsService.endLesson(body.lessonId, body.endedBy);
 	}
 
-	@Get(':id/details')
-	async getLessonWithTasksAndQuestions(@Param('id') lessonId: string) {
-		return this.lessonsService.getLessonWithTasksAndQuestions(lessonId);
+	@Post('cancel')
+	async cancelLessonByStudent(@Body() body: { lessonId: string, reason: string }) {
+		console.log(`📥 [POST] /cancel получен:`, body);
+		return this.lessonsService.cancelLessonByStudent(body.lessonId, body.reason);
 	}
 
 	@Post('tasks')
@@ -119,9 +117,14 @@ export class LessonsController {
 		return this.lessonsService.completeTask(taskId, body.completedBy);
 	}
 
-	@Post('questions/:questionId/answer')
+	@Put('questions/:questionId/answer')
 	async answerQuestion(@Param('questionId') questionId: string, @Body() body: { answer: string, answeredBy: string }) {
 		return this.lessonsService.answerQuestion(questionId, body.answer, body.answeredBy);
+	}
+
+	@Get(':id/details')
+	async getLessonWithTasksAndQuestions(@Param('id') lessonId: string) {
+		return this.lessonsService.getLessonWithTasksAndQuestions(lessonId);
 	}
 
 	@Get(':id/tasks')
@@ -134,10 +137,11 @@ export class LessonsController {
 		return this.lessonsService.getQuestionsForLesson(lessonId);
 	}
 
-	@Get('student/:studentId/sent-requests')
-	async getStudentSentRequests(@Param('studentId') studentId: string) {
-		console.log(`📥 [GET] /student/:studentId/sent-requests получен для studentId: ${studentId}`);
-		return this.lessonsService.getStudentSentRequests(studentId);
+	// ==================== ОБЩИЙ ENDPOINT (должен быть ПОСЛЕДНИМ) ====================
+
+	@Get(':id')
+	async getLessonById(@Param('id') lessonId: string) {
+		return this.lessonsService.getLessonById(lessonId);
 	}
 
 }

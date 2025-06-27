@@ -1,4 +1,6 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToMany } from 'typeorm';
+import { Task } from './task.entity';
+import { Question } from './question.entity';
 
 @Entity('lessons')
 export class Lesson {
@@ -55,5 +57,9 @@ export class Lesson {
   startedBy: string | null; // кто запустил видеосвязь
 
   // Связи с задачами и вопросами
-  // Удаляем прямые связи - они будут через foreign key
+  @OneToMany(() => Task, task => task.lesson)
+  tasks: Task[];
+
+  @OneToMany(() => Question, question => question.lesson)
+  questions: Question[];
 }
