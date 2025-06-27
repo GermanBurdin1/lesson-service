@@ -636,7 +636,14 @@ export class LessonsService {
 			throw new Error('Урок не найден');
 		}
 
-		return lesson;
+		// Получаем информацию о преподавателе
+		const teacher = await this.authClient.getUserInfo(lesson.teacherId);
+		const teacherName = `${teacher?.name ?? ''} ${teacher?.surname ?? ''}`.trim();
+
+		return {
+			...lesson,
+			teacherName
+		};
 	}
 
 	// Добавление задачи к уроку
