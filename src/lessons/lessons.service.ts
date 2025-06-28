@@ -8,7 +8,7 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { AuthClient } from '../auth/auth.client';
 import { HttpService } from '@nestjs/axios';
 import { lastValueFrom } from 'rxjs';
-import { In } from 'typeorm';
+import { In, Between } from 'typeorm';
 
 @Injectable()
 export class LessonsService {
@@ -35,44 +35,17 @@ export class LessonsService {
 	}
 
 	async bookLesson(studentId: string, teacherId: string, scheduledAt: Date) {
-		// ==================== ПРОВЕРКА КОНФЛИКТОВ ВРЕМЕНИ ====================
-		console.log(`🔍 Проверка конфликтов для преподавателя ${teacherId} на время ${scheduledAt}`);
+		// ==================== ВАЛИДАЦИЯ ВРЕМЕНИ УРОКА ====================
+		console.log(`🔍 Проверка времени урока для преподавателя ${teacherId} и студента ${studentId} на время ${scheduledAt}`);
 		
-		// TODO: Получить из настроек преподавателя: длительность урока и время отдыха
-		const LESSON_DURATION_MINUTES = 60; // Фиксированно 60 минут на урок
-		const BREAK_DURATION_MINUTES = 15; // Фиксированно 15 минут перерыв - TODO: сделать настраиваемым
-		
-		const lessonStartTime = new Date(scheduledAt);
-		const lessonEndTime = new Date(lessonStartTime.getTime() + LESSON_DURATION_MINUTES * 60000);
-		const totalSlotEndTime = new Date(lessonEndTime.getTime() + BREAK_DURATION_MINUTES * 60000);
-		
-		// Проверяем конфликты с существующими подтвержденными уроками
-		const existingLessons = await this.lessonRepo.find({
-			where: [
-				{ teacherId, status: 'confirmed' },
-				{ teacherId, status: 'in_progress' }
-			]
-		});
-		
-		for (const existingLesson of existingLessons) {
-			const existingStart = new Date(existingLesson.scheduledAt);
-			const existingEnd = new Date(existingStart.getTime() + LESSON_DURATION_MINUTES * 60000);
-			const existingSlotEnd = new Date(existingEnd.getTime() + BREAK_DURATION_MINUTES * 60000);
-			
-			// Проверяем пересечение временных слотов (урок + перерыв)
-			const hasConflict = (
-				(lessonStartTime >= existingStart && lessonStartTime < existingSlotEnd) ||
-				(totalSlotEndTime > existingStart && totalSlotEndTime <= existingSlotEnd) ||
-				(lessonStartTime <= existingStart && totalSlotEndTime >= existingSlotEnd)
-			);
-			
-			if (hasConflict) {
-				console.log(`❌ Конфликт времени обнаружен с уроком ${existingLesson.id}`);
-				console.log(`   Существующий: ${existingStart.toISOString()} - ${existingSlotEnd.toISOString()}`);
-				console.log(`   Запрашиваемый: ${lessonStartTime.toISOString()} - ${totalSlotEndTime.toISOString()}`);
-				throw new Error(`Ce créneau n'est plus disponible. Le professeur a déjà un cours de ${existingStart.toLocaleString('fr-FR')} à ${existingSlotEnd.toLocaleString('fr-FR')}.`);
-			}
-		}
+		// Используем новую централизованную валидацию
+		    // Проверка, что время не в прошлом
+    const now = new Date();
+    if (scheduledAt <= now) {
+      throw new Error('Impossible de réserver un créneau dans le passé');
+    }
+
+    await this.validateLessonTime(teacherId, studentId, scheduledAt);
 		
 		// Проверяем дублирование заявок от одного студента на одно время
 		const existingStudentRequests = await this.lessonRepo.find({
@@ -87,7 +60,7 @@ export class LessonsService {
 			throw new Error('Vous avez déjà une demande ou un cours programmé à cette heure.');
 		}
 		
-		console.log(`✅ Проверка конфликтов пройдена успешно`);
+		console.log(`✅ Проверка времени урока завершена успешно`);
 		
 		// ==================== СОЗДАНИЕ УРОКА ====================
 		const lesson = this.lessonRepo.create({
@@ -552,6 +525,298 @@ export class LessonsService {
 		};
 	}
 
+	// ==================== ВАЛИДАЦИЯ ВРЕМЕНИ ЗАНЯТИЙ ====================
+
+	// Получение полного расписания преподавателя с умными интервалами
+	async getAvailableSlots(teacherId: string, date: Date): Promise<{
+		time: string;
+		available: boolean;
+		type: 'available' | 'lesson' | 'break' | 'blocked';
+		reason?: string;
+		studentName?: string;
+		lessonId?: string;
+		interval?: {
+			start: string;
+			end: string;
+			duration: number; // в минутах
+		};
+	}[]> {
+		console.log(`🔍 Получение полного расписания преподавателя ${teacherId} на дату ${date.toDateString()}`);
+		
+		// Получаем все занятия преподавателя на указанную дату
+		const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0);
+		const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59);
+		
+		const bookedLessons = await this.lessonRepo.find({
+			where: {
+				teacherId,
+				status: In(['confirmed', 'in_progress']),
+				scheduledAt: Between(startOfDay, endOfDay)
+			},
+			order: { scheduledAt: 'ASC' }
+		});
+
+		// Получаем информацию о студентах для уроков
+		const lessonsWithStudents = await Promise.all(
+			bookedLessons.map(async (lesson) => {
+				try {
+					const student = await this.authClient.getUserInfo(lesson.studentId);
+					return {
+						...lesson,
+						studentName: `${student?.name || ''} ${student?.surname || ''}`.trim() || 'Nom inconnu'
+					};
+				} catch (error) {
+					console.warn(`⚠️ Impossible de récupérer l'info étudiant ${lesson.studentId}:`, error);
+					return {
+						...lesson,
+						studentName: 'Nom inconnu'
+					};
+				}
+			})
+		);
+
+		// Создаем временную сетку каждые 30 минут с 8:00 до 22:00
+		const slots = [];
+		const baseDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+		const now = new Date();
+		
+		for (let hour = 8; hour <= 21; hour++) {
+			for (let minute = 0; minute < 60; minute += 30) {
+				const slotTime = new Date(baseDate.getTime() + hour * 60 * 60 * 1000 + minute * 60 * 1000);
+				
+				// Пропускаем прошедшие слоты, если это сегодняшний день
+				if (slotTime <= now) {
+					continue;
+				}
+				
+				const timeString = slotTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+				
+				// Анализируем тип слота
+				const slotInfo = this.analyzeTimeSlot(slotTime, lessonsWithStudents);
+				
+				slots.push({
+					time: timeString,
+					...slotInfo
+				});
+			}
+		}
+
+		// Группируем доступные слоты в интервалы
+		const slotsWithIntervals = this.groupAvailableSlots(slots);
+		
+		console.log(`✅ Сгенерировано ${slots.length} слотов:`, {
+			available: slots.filter(s => s.available).length,
+			lessons: slots.filter(s => s.type === 'lesson').length,
+			breaks: slots.filter(s => s.type === 'break').length,
+			blocked: slots.filter(s => s.type === 'blocked').length
+		});
+		
+		return slotsWithIntervals;
+	}
+
+	// Анализ типа временного слота
+	private analyzeTimeSlot(slotTime: Date, lessonsWithStudents: any[]): {
+		available: boolean;
+		type: 'available' | 'lesson' | 'break' | 'blocked';
+		reason?: string;
+		studentName?: string;
+		lessonId?: string;
+	} {
+		const slotEnd = new Date(slotTime.getTime() + 60 * 60 * 1000); // Проверяем час от начала слота
+		
+		for (const lesson of lessonsWithStudents) {
+			const lessonStart = new Date(lesson.scheduledAt);
+			const lessonEnd = new Date(lessonStart.getTime() + 60 * 60 * 1000);
+			
+			// Проверяем, попадает ли слот в урок
+			if (slotTime >= lessonStart && slotTime < lessonEnd) {
+				return {
+					available: false,
+					type: 'lesson',
+					reason: `Cours avec ${lesson.studentName}`,
+					studentName: lesson.studentName,
+					lessonId: lesson.id
+				};
+			}
+			
+			// Проверяем, попадает ли слот в перерыв (15 минут до урока)
+			const breakStart = new Date(lessonStart.getTime() - 15 * 60 * 1000);
+			if (slotTime >= breakStart && slotTime < lessonStart) {
+				return {
+					available: false,
+					type: 'break',
+					reason: `Préparation (cours dans ${Math.round((lessonStart.getTime() - slotTime.getTime()) / (1000 * 60))} min)`
+				};
+			}
+			
+			// Проверяем, попадает ли слот в перерыв (15 минут после урока)
+			const breakEnd = new Date(lessonEnd.getTime() + 15 * 60 * 1000);
+			if (slotTime >= lessonEnd && slotTime < breakEnd) {
+				return {
+					available: false,
+					type: 'break',
+					reason: `Pause (après cours avec ${lesson.studentName})`
+				};
+			}
+			
+			// Проверяем пересечение с учетом полной блокировки
+			if (slotTime < breakEnd && slotEnd > breakStart) {
+				return {
+					available: false,
+					type: 'blocked',
+					reason: `Période bloquée (cours avec ${lesson.studentName})`
+				};
+			}
+		}
+		
+		return {
+			available: true,
+			type: 'available'
+		};
+	}
+
+	// Группировка доступных слотов в интервалы
+	private groupAvailableSlots(slots: any[]): any[] {
+		const result = [...slots];
+		
+		// Найдем доступные интервалы и добавим информацию о продолжительности
+		let currentInterval: { start: string; startIndex: number } | null = null;
+		
+		for (let i = 0; i < result.length; i++) {
+			const slot = result[i];
+			
+			if (slot.available && slot.type === 'available') {
+				// Начинаем новый интервал
+				if (!currentInterval) {
+					currentInterval = { start: slot.time, startIndex: i };
+				}
+			} else {
+				// Заканчиваем текущий интервал
+				if (currentInterval) {
+					const duration = (i - currentInterval.startIndex) * 30; // каждый слот 30 минут
+					const endTime = i > 0 ? result[i - 1].time : slot.time;
+					
+					// Добавляем информацию об интервале ко всем слотам в этом интервале
+					for (let j = currentInterval.startIndex; j < i; j++) {
+						result[j].interval = {
+							start: currentInterval.start,
+							end: this.addMinutesToTime(currentInterval.start, duration),
+							duration
+						};
+					}
+					
+					currentInterval = null;
+				}
+			}
+		}
+		
+		// Обрабатываем последний интервал, если он остался открытым
+		if (currentInterval) {
+			const duration = (result.length - currentInterval.startIndex) * 30;
+			for (let j = currentInterval.startIndex; j < result.length; j++) {
+				result[j].interval = {
+					start: currentInterval.start,
+					end: this.addMinutesToTime(currentInterval.start, duration),
+					duration
+				};
+			}
+		}
+		
+		return result;
+	}
+
+	// Вспомогательный метод для добавления минут к времени
+	private addMinutesToTime(timeString: string, minutes: number): string {
+		const [hours, mins] = timeString.split(':').map(Number);
+		const totalMinutes = hours * 60 + mins + minutes;
+		const newHours = Math.floor(totalMinutes / 60);
+		const newMins = totalMinutes % 60;
+		return `${newHours.toString().padStart(2, '0')}:${newMins.toString().padStart(2, '0')}`;
+	}
+
+	// Проверка доступности временного слота (устаревший метод, оставлен для совместимости)
+	private isSlotAvailable(slotTime: Date, bookedLessons: Lesson[]): boolean {
+		const slotEnd = new Date(slotTime.getTime() + 60 * 60 * 1000); // Урок длится 1 час
+		
+		for (const lesson of bookedLessons) {
+			const lessonStart = new Date(lesson.scheduledAt);
+			const lessonEnd = new Date(lessonStart.getTime() + 60 * 60 * 1000);
+			
+			// Блокируем 15 минут до и после урока
+			const blockStart = new Date(lessonStart.getTime() - 15 * 60 * 1000);
+			const blockEnd = new Date(lessonEnd.getTime() + 15 * 60 * 1000);
+			
+			// Проверяем пересечение с заблокированным временем
+			const hasConflict = slotTime < blockEnd && slotEnd > blockStart;
+			
+			if (hasConflict) {
+				return false; // Слот недоступен
+			}
+		}
+		
+		return true; // Слот доступен
+	}
+
+	// Проверка на перекрывающиеся занятия и минимальный перерыв
+	async validateLessonTime(teacherId: string, studentId: string, scheduledAt: Date, excludeLessonId?: string): Promise<void> {
+		const lessonStart = new Date(scheduledAt);
+		const lessonEnd = new Date(lessonStart.getTime() + 60 * 60 * 1000); // Урок длится 1 час
+
+		// Находим все confirmed/in_progress уроки преподавателя и студента в этот день
+		const whereConditions = [
+			{
+				teacherId,
+				status: In(['confirmed', 'in_progress']),
+				scheduledAt: Between(
+					new Date(lessonStart.getFullYear(), lessonStart.getMonth(), lessonStart.getDate()),
+					new Date(lessonStart.getFullYear(), lessonStart.getMonth(), lessonStart.getDate(), 23, 59, 59)
+				)
+			},
+			{
+				studentId,
+				status: In(['confirmed', 'in_progress']),
+				scheduledAt: Between(
+					new Date(lessonStart.getFullYear(), lessonStart.getMonth(), lessonStart.getDate()),
+					new Date(lessonStart.getFullYear(), lessonStart.getMonth(), lessonStart.getDate(), 23, 59, 59)
+				)
+			}
+		];
+
+		const existingLessons = await this.lessonRepo.find({
+			where: whereConditions
+		});
+
+		// Исключаем текущий урок если редактируем
+		const filteredLessons = excludeLessonId 
+			? existingLessons.filter(lesson => lesson.id !== excludeLessonId)
+			: existingLessons;
+
+		for (const existingLesson of filteredLessons) {
+			const existingStart = new Date(existingLesson.scheduledAt);
+			const existingEnd = new Date(existingStart.getTime() + 60 * 60 * 1000);
+
+			// Проверяем прямое перекрытие
+			const isOverlapping = (lessonStart < existingEnd && lessonEnd > existingStart);
+
+			if (isOverlapping) {
+				const conflictTime = existingStart.toLocaleString('fr-FR');
+				const participantName = existingLesson.teacherId === teacherId ? 'ce professeur' : 'cet étudiant';
+				throw new Error(`❌ Conflit d'horaire: ${participantName} a déjà un cours à ${conflictTime}`);
+			}
+
+			// Проверяем минимальный перерыв 15 минут
+			const timeDiffMinutes = Math.abs(lessonStart.getTime() - existingStart.getTime()) / (1000 * 60);
+			
+			if (timeDiffMinutes < 75) { // 60 мин урок + 15 мин перерыв
+				const conflictTime = existingStart.toLocaleString('fr-FR');
+				const participantName = existingLesson.teacherId === teacherId ? 'ce professeur' : 'cet étudiant';
+				throw new Error(`❌ Temps insuffisant: ${participantName} a un cours à ${conflictTime}. Minimum 15 minutes de pause requis entre les cours.`);
+			}
+		}
+
+		console.log('✅ Validation du temps du cours réussie');
+	}
+
 	// ==================== НОВЫЕ МЕТОДЫ ДЛЯ РАБОТЫ С ЗАДАЧАМИ, ВОПРОСАМИ И НАЧАЛОМ УРОКА ====================
 
 	// Начало урока при запуске видео
@@ -564,7 +829,7 @@ export class LessonsService {
 		}
 
 		if (lesson.status !== 'confirmed') {
-			throw new Error('Можно начать только подтвержденный урок');
+			throw new Error('Можно начать только подтвержденный урок (статус: confirmed)');
 		}
 
 		// Обновляем статус урока

@@ -69,6 +69,18 @@ export class LessonsController {
 		return this.lessonsService.getAllConfirmedLessonsForTeacher(teacherId);
 	}
 
+	// ==================== ЭНДПОИНТ ДЛЯ ПОЛУЧЕНИЯ ДОСТУПНЫХ СЛОТОВ ====================
+
+	@Get('teacher/:teacherId/available-slots')
+	async getAvailableSlots(
+		@Param('teacherId') teacherId: string,
+		@Query('date') date?: string
+	) {
+		console.log(`📥 [GET] /teacher/${teacherId}/available-slots вызван для даты: ${date || 'сегодня'}`);
+		const targetDate = date ? new Date(date) : new Date();
+		return this.lessonsService.getAvailableSlots(teacherId, targetDate);
+	}
+
 	// ==================== НОВЫЕ ЭНДПОИНТЫ ДЛЯ РАБОТЫ С ЗАДАЧАМИ, ВОПРОСАМИ И НАЧАЛОМ УРОКА ====================
 
 	@Post('start')

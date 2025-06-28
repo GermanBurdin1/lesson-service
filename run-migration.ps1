@@ -6,73 +6,67 @@ param(
     [switch]$Show
 )
 
-Write-Host "🗃️  Управление миграциями lesson-service" -ForegroundColor Cyan
+Write-Host "Database Migrations for lesson-service" -ForegroundColor Cyan
 
-# Проверяем, что мы в правильной директории
 if (!(Test-Path "package.json")) {
-    Write-Host "❌ Ошибка: package.json не найден. Убедитесь, что вы в директории lesson-service" -ForegroundColor Red
+    Write-Host "Error: package.json not found. Make sure you are in lesson-service directory" -ForegroundColor Red
     exit 1
 }
 
-# Показать выполненные миграции
 if ($Show) {
-    Write-Host "📋 Показываем историю миграций..." -ForegroundColor Yellow
+    Write-Host "Showing migration history..." -ForegroundColor Yellow
     try {
-        npm run typeorm migration:show
+        npm run typeorm -- migration:show -d src/data-source.ts
     } catch {
-        Write-Host "❌ Ошибка при показе миграций: $_" -ForegroundColor Red
+        Write-Host "Error showing migrations: $_" -ForegroundColor Red
     }
     exit 0
 }
 
-# Откатить последнюю миграцию
 if ($Revert) {
-    Write-Host "⏪ Откат последней миграции..." -ForegroundColor Yellow
-    $confirmation = Read-Host "Вы уверены, что хотите откатить последнюю миграцию? (y/N)"
+    Write-Host "Reverting last migration..." -ForegroundColor Yellow
+    $confirmation = Read-Host "Are you sure you want to revert the last migration? (y/N)"
     
     if ($confirmation -eq 'y' -or $confirmation -eq 'Y') {
         try {
-            npm run typeorm migration:revert
+            npm run typeorm -- migration:revert -d src/data-source.ts
             
             if ($LASTEXITCODE -eq 0) {
-                Write-Host "✅ Миграция успешно откачена!" -ForegroundColor Green
+                Write-Host "Migration reverted successfully!" -ForegroundColor Green
             } else {
-                Write-Host "❌ Ошибка при откате миграции" -ForegroundColor Red
+                Write-Host "Error reverting migration" -ForegroundColor Red
             }
         } catch {
-            Write-Host "❌ Произошла ошибка: $_" -ForegroundColor Red
+            Write-Host "Error occurred: $_" -ForegroundColor Red
         }
     } else {
-        Write-Host "🚫 Откат отменен" -ForegroundColor Yellow
+        Write-Host "Revert cancelled" -ForegroundColor Yellow
     }
     exit 0
 }
 
-# Выполнить миграции (по умолчанию)
-Write-Host "🚀 Выполнение миграций..." -ForegroundColor Yellow
+Write-Host "Running migrations..." -ForegroundColor Yellow
 
 try {
-    # Показываем текущее состояние
-    Write-Host "`n📊 Текущее состояние миграций:" -ForegroundColor Blue
-    npm run typeorm migration:show
+    Write-Host "`nCurrent migration status:" -ForegroundColor Blue
+    npm run typeorm -- migration:show -d src/data-source.ts
     
-    Write-Host "`n🔄 Применение новых миграций..." -ForegroundColor Yellow
-    npm run typeorm migration:run
+    Write-Host "`nApplying new migrations..." -ForegroundColor Yellow
+    npm run migration:run
     
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "✅ Все миграции успешно применены!" -ForegroundColor Green
+        Write-Host "All migrations applied successfully!" -ForegroundColor Green
         
-        # Показываем обновленное состояние
-        Write-Host "`n📊 Обновленное состояние:" -ForegroundColor Blue
-        npm run typeorm migration:show
+        Write-Host "`nUpdated status:" -ForegroundColor Blue
+        npm run typeorm -- migration:show -d src/data-source.ts
     } else {
-        Write-Host "❌ Ошибка при выполнении миграций" -ForegroundColor Red
+        Write-Host "Error running migrations" -ForegroundColor Red
     }
 } catch {
-    Write-Host "❌ Произошла ошибка: $_" -ForegroundColor Red
+    Write-Host "Error occurred: $_" -ForegroundColor Red
 }
 
-Write-Host "`n💡 Доступные команды:" -ForegroundColor Cyan
-Write-Host "   .\run-migration.ps1           - Выполнить все новые миграции" -ForegroundColor Gray
-Write-Host "   .\run-migration.ps1 -Show     - Показать историю миграций" -ForegroundColor Gray
-Write-Host "   .\run-migration.ps1 -Revert   - Откатить последнюю миграцию" -ForegroundColor Gray 
+Write-Host "`nAvailable commands:" -ForegroundColor Cyan
+Write-Host "   .\run-migration.ps1           - Run all new migrations" -ForegroundColor Gray
+Write-Host "   .\run-migration.ps1 -Show     - Show migration history" -ForegroundColor Gray
+Write-Host "   .\run-migration.ps1 -Revert   - Revert last migration" -ForegroundColor Gray 
