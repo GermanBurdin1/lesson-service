@@ -450,13 +450,19 @@ export class LessonsService {
 			throw new Error('Урок не найден');
 		}
 
-		// Получаем информацию о преподавателе
-		const teacher = await this.authClient.getUserInfo(lesson.teacherId);
+		// Получаем информацию о преподавателе и студенте
+		const [teacher, student] = await Promise.all([
+			this.authClient.getUserInfo(lesson.teacherId),
+			this.authClient.getUserInfo(lesson.studentId)
+		]);
+
 		const teacherName = `${teacher?.name ?? ''} ${teacher?.surname ?? ''}`.trim();
+		const studentName = `${student?.name ?? ''} ${student?.surname ?? ''}`.trim();
 
 		return {
 			...lesson,
-			teacherName
+			teacherName,
+			studentName
 		};
 	}
 
@@ -901,13 +907,19 @@ export class LessonsService {
 			throw new Error('Урок не найден');
 		}
 
-		// Получаем информацию о преподавателе
-		const teacher = await this.authClient.getUserInfo(lesson.teacherId);
+		// Получаем информацию о преподавателе и студенте
+		const [teacher, student] = await Promise.all([
+			this.authClient.getUserInfo(lesson.teacherId),
+			this.authClient.getUserInfo(lesson.studentId)
+		]);
+
 		const teacherName = `${teacher?.name ?? ''} ${teacher?.surname ?? ''}`.trim();
+		const studentName = `${student?.name ?? ''} ${student?.surname ?? ''}`.trim();
 
 		return {
 			...lesson,
-			teacherName
+			teacherName,
+			studentName
 		};
 	}
 
