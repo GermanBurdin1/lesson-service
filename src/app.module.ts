@@ -5,6 +5,8 @@ import { LessonsModule } from './lessons/lessons.module';
 import { Lesson } from './lessons/lesson.entity';
 import { Task } from './lessons/task.entity';
 import { Question } from './lessons/question.entity';
+import { LessonNotes } from './lessons/lesson-notes.entity';
+import { HomeworkItem } from './lessons/homework-item.entity';
 
 @Module({
 	imports: [
@@ -20,7 +22,7 @@ import { Question } from './lessons/question.entity';
 				username: config.get<string>('DB_USERNAME'),
 				password: config.get<string>('DB_PASSWORD'),
 				database: config.get<string>('DB_NAME'),
-				entities: [Lesson, Task, Question],
+				entities: [Lesson, Task, Question, LessonNotes, HomeworkItem],
 				migrations: ['dist/migrations/*.js'],
 				synchronize: true,
 			}),

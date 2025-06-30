@@ -1,6 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToMany, OneToOne } from 'typeorm';
 import { Task } from './task.entity';
 import { Question } from './question.entity';
+import { LessonNotes } from './lesson-notes.entity';
+import { HomeworkItem } from './homework-item.entity';
 
 @Entity('lessons')
 export class Lesson {
@@ -62,4 +64,11 @@ export class Lesson {
 
   @OneToMany(() => Question, question => question.lesson)
   questions: Question[];
+
+  // Связи с заметками и домашними заданиями
+  @OneToOne(() => LessonNotes, notes => notes.lesson)
+  notes: LessonNotes;
+
+  @OneToMany(() => HomeworkItem, homework => homework.lesson)
+  homeworkItems: HomeworkItem[];
 }

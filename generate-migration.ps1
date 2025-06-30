@@ -16,8 +16,8 @@ if (!(Test-Path "package.json")) {
 
 # Генерируем миграцию
 try {
-    Write-Host "📝 Выполняется команда: npm run typeorm migration:generate -- --name $MigrationName" -ForegroundColor Yellow
-    npm run typeorm migration:generate -- --name $MigrationName
+    Write-Host "📝 Выполняется команда: npm run migration:generate -- -d src/data-source.ts --name $MigrationName" -ForegroundColor Yellow
+    npm run migration:generate -- -d src/data-source.ts --name $MigrationName
     
     if ($LASTEXITCODE -eq 0) {
         Write-Host "✅ Миграция '$MigrationName' успешно сгенерирована!" -ForegroundColor Green

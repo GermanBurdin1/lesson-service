@@ -4,6 +4,8 @@ import { Repository } from 'typeorm';
 import { Lesson } from './lesson.entity';
 import { Task } from './task.entity';
 import { Question } from './question.entity';
+import { LessonNotes } from './lesson-notes.entity';
+import { HomeworkItem } from './homework-item.entity';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { AuthClient } from '../auth/auth.client';
 import { HttpService } from '@nestjs/axios';
@@ -19,6 +21,10 @@ export class LessonsService {
 		private taskRepo: Repository<Task>,
 		@InjectRepository(Question)
 		private questionRepo: Repository<Question>,
+		@InjectRepository(LessonNotes)
+		private lessonNotesRepo: Repository<LessonNotes>,
+		@InjectRepository(HomeworkItem)
+		private homeworkRepo: Repository<HomeworkItem>,
 		private readonly amqp: AmqpConnection,
 		private readonly authClient: AuthClient,
 		private readonly httpService: HttpService,
@@ -1102,6 +1108,167 @@ export class LessonsService {
 		
 		console.log(`📋 Найдено ${enrichedLessons.length} заявок для студента`);
 		return enrichedLessons;
+	}
+
+	// ==================== МЕТОДЫ ДЛЯ РАБОТЫ С ЗАМЕТКАМИ УРОКА ====================
+
+	// Сохранение/обновление заметок урока
+	async saveLessonNotes(lessonId: string, tasksContent: string | null, questionsContent: string | null, materialsContent: string | null, createdBy: string, createdByRole: 'student' | 'teacher') {
+		console.log(`📝 [START] Сохранение заметок урока (lessonId=${lessonId})`);
+
+		const lesson = await this.lessonRepo.findOneBy({ id: lessonId });
+		if (!lesson) {
+			throw new Error('Урок не найден');
+		}
+
+		// Ищем существующие заметки
+		let notes = await this.lessonNotesRepo.findOne({ where: { lessonId } });
+
+		if (notes) {
+			// Обновляем существующие заметки
+			notes.tasksContent = tasksContent;
+			notes.questionsContent = questionsContent;
+			notes.materialsContent = materialsContent;
+			notes.updatedAt = new Date();
+		} else {
+			// Создаем новые заметки
+			notes = this.lessonNotesRepo.create({
+				lessonId,
+				tasksContent,
+				questionsContent,
+				materialsContent,
+				createdBy,
+				createdByRole
+			});
+		}
+
+		const savedNotes = await this.lessonNotesRepo.save(notes);
+		console.log(`✅ [END] Заметки урока сохранены: ${savedNotes.id}`);
+		return savedNotes;
+	}
+
+	// Получение заметок урока
+	async getLessonNotes(lessonId: string) {
+		return this.lessonNotesRepo.findOne({ where: { lessonId } });
+	}
+
+	// ==================== МЕТОДЫ ДЛЯ РАБОТЫ С ДОМАШНИМИ ЗАДАНИЯМИ ====================
+
+	// Добавление домашнего задания
+	async addHomeworkItem(lessonId: string, title: string, description: string | null, itemType: 'task' | 'question' | 'material', originalItemId: string | null, dueDate: Date, createdBy: string, createdByRole: 'student' | 'teacher') {
+		console.log(`📚 [START] Добавление домашнего задания (lessonId=${lessonId}, type=${itemType})`);
+
+		const lesson = await this.lessonRepo.findOneBy({ id: lessonId });
+		if (!lesson) {
+			throw new Error('Урок не найден');
+		}
+
+		const homework = this.homeworkRepo.create({
+			lessonId,
+			title,
+			description,
+			itemType,
+			originalItemId,
+			dueDate,
+			createdBy,
+			createdByRole
+		});
+
+		const savedHomework = await this.homeworkRepo.save(homework);
+
+		// Уведомляем студента о новом домашнем задании
+		const notificationTargetId = lesson.studentId;
+		
+		const user = await this.authClient.getUserInfo(createdBy);
+		const creatorName = `${user?.name ?? ''} ${user?.surname ?? ''}`.trim();
+
+		const payload = {
+			user_id: notificationTargetId,
+			title: 'Nouveau devoir ajouté',
+			message: `${creatorName} vous a assigné un nouveau devoir: "${title}"`,
+			type: 'homework_assigned',
+			metadata: {
+				lessonId,
+				homeworkId: savedHomework.id,
+				title,
+				itemType,
+				dueDate,
+				createdBy,
+				createdByRole,
+				creatorName
+			},
+			status: 'unread',
+		};
+
+		await this.amqp.publish('lesson_exchange', 'homework_assigned', payload);
+
+		console.log(`✅ [END] Домашнее задание добавлено: ${savedHomework.id}`);
+		return savedHomework;
+	}
+
+	// Получение домашних заданий урока
+	async getHomeworkForLesson(lessonId: string) {
+		return this.homeworkRepo.find({
+			where: { lessonId },
+			order: { createdAt: 'ASC' }
+		});
+	}
+
+	// Получение всех домашних заданий студента
+	async getHomeworkForStudent(studentId: string) {
+		const lessons = await this.lessonRepo.find({
+			where: { studentId },
+			select: ['id']
+		});
+
+		const lessonIds = lessons.map(lesson => lesson.id);
+		
+		if (lessonIds.length === 0) {
+			return [];
+		}
+
+		return this.homeworkRepo.find({
+			where: { lessonId: In(lessonIds) },
+			order: { dueDate: 'ASC' },
+			relations: ['lesson']
+		});
+	}
+
+	// Отметка домашнего задания как выполненного
+	async completeHomework(homeworkId: string, completedBy: string) {
+		const homework = await this.homeworkRepo.findOneBy({ id: homeworkId });
+		if (!homework) {
+			throw new Error('Домашнее задание не найдено');
+		}
+
+		homework.status = 'finished';
+		homework.completedAt = new Date();
+		await this.homeworkRepo.save(homework);
+
+		return homework;
+	}
+
+	// Получение урока с полной информацией (включая заметки и домашние задания)
+	async getLessonWithFullDetails(lessonId: string) {
+		const lesson = await this.lessonRepo.findOne({
+			where: { id: lessonId },
+			relations: ['tasks', 'questions']
+		});
+
+		if (!lesson) {
+			throw new Error('Урок не найден');
+		}
+
+		const [notes, homework] = await Promise.all([
+			this.getLessonNotes(lessonId),
+			this.getHomeworkForLesson(lessonId)
+		]);
+
+		return {
+			...lesson,
+			notes,
+			homework
+		};
 	}
 
 }

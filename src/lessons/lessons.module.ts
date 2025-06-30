@@ -3,6 +3,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Lesson } from './lesson.entity';
 import { Task } from './task.entity';
 import { Question } from './question.entity';
+import { LessonNotes } from './lesson-notes.entity';
+import { HomeworkItem } from './homework-item.entity';
 import { LessonsService } from './lessons.service';
 import { LessonsController } from './lessons.controller';
 import { RabbitMQModule } from '@golevelup/nestjs-rabbitmq';
@@ -15,7 +17,7 @@ dotenv.config();
 
 @Module({
 	imports: [
-		TypeOrmModule.forFeature([Lesson, Task, Question]),
+		TypeOrmModule.forFeature([Lesson, Task, Question, LessonNotes, HomeworkItem]),
 		HttpModule,
 		RabbitMQModule.forRoot(RabbitMQModule, {
 			// uri: 'amqp://guest:guest@rabbitmq:5672', // pour docker

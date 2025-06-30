@@ -156,4 +156,84 @@ export class LessonsController {
 		return this.lessonsService.getLessonById(lessonId);
 	}
 
+	// ==================== ЭНДПОИНТЫ ДЛЯ ЗАМЕТОК УРОКА ====================
+
+	@Post(':id/notes')
+	async saveLessonNotes(
+		@Param('id') lessonId: string,
+		@Body() body: {
+			tasksContent?: string | null;
+			questionsContent?: string | null;
+			materialsContent?: string | null;
+			createdBy: string;
+			createdByRole: 'student' | 'teacher';
+		}
+	) {
+		console.log(`📥 [POST] /:id/notes получен:`, body);
+		return this.lessonsService.saveLessonNotes(
+			lessonId,
+			body.tasksContent || null,
+			body.questionsContent || null,
+			body.materialsContent || null,
+			body.createdBy,
+			body.createdByRole
+		);
+	}
+
+	@Get(':id/notes')
+	async getLessonNotes(@Param('id') lessonId: string) {
+		return this.lessonsService.getLessonNotes(lessonId);
+	}
+
+	// ==================== ЭНДПОИНТЫ ДЛЯ ДОМАШНИХ ЗАДАНИЙ ====================
+
+	@Post(':id/homework')
+	async addHomeworkItem(
+		@Param('id') lessonId: string,
+		@Body() body: {
+			title: string;
+			description?: string | null;
+			itemType: 'task' | 'question' | 'material';
+			originalItemId?: string | null;
+			dueDate: string;
+			createdBy: string;
+			createdByRole: 'student' | 'teacher';
+		}
+	) {
+		console.log(`📥 [POST] /:id/homework получен:`, body);
+		return this.lessonsService.addHomeworkItem(
+			lessonId,
+			body.title,
+			body.description || null,
+			body.itemType,
+			body.originalItemId || null,
+			new Date(body.dueDate),
+			body.createdBy,
+			body.createdByRole
+		);
+	}
+
+	@Get(':id/homework')
+	async getHomeworkForLesson(@Param('id') lessonId: string) {
+		return this.lessonsService.getHomeworkForLesson(lessonId);
+	}
+
+	@Get('student/:studentId/homework')
+	async getHomeworkForStudent(@Param('studentId') studentId: string) {
+		return this.lessonsService.getHomeworkForStudent(studentId);
+	}
+
+	@Put('homework/:homeworkId/complete')
+	async completeHomework(
+		@Param('homeworkId') homeworkId: string,
+		@Body() body: { completedBy: string }
+	) {
+		return this.lessonsService.completeHomework(homeworkId, body.completedBy);
+	}
+
+	@Get(':id/full-details')
+	async getLessonWithFullDetails(@Param('id') lessonId: string) {
+		return this.lessonsService.getLessonWithFullDetails(lessonId);
+	}
+
 }
