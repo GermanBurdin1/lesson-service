@@ -1236,22 +1236,29 @@ export class LessonsService {
 
 	// Получение всех домашних заданий преподавателя
 	async getHomeworkForTeacher(teacherId: string) {
+		console.log(`📋 [SERVICE] getHomeworkForTeacher вызван для teacherId: ${teacherId}`);
+		
 		const lessons = await this.lessonRepo.find({
 			where: { teacherId },
 			select: ['id']
 		});
 
+		console.log(`📋 [SERVICE] Найдено ${lessons.length} уроков для преподавателя ${teacherId}`);
 		const lessonIds = lessons.map(lesson => lesson.id);
 		
 		if (lessonIds.length === 0) {
+			console.log(`📋 [SERVICE] У преподавателя нет уроков, возвращаем пустой массив`);
 			return [];
 		}
 
-		return this.homeworkRepo.find({
+		const homework = await this.homeworkRepo.find({
 			where: { lessonId: In(lessonIds) },
 			order: { dueDate: 'ASC' },
 			relations: ['lesson']
 		});
+
+		console.log(`📋 [SERVICE] Найдено ${homework.length} домашних заданий для преподавателя ${teacherId}`);
+		return homework;
 	}
 
 	// Отметка домашнего задания как выполненного

@@ -220,12 +220,18 @@ export class LessonsController {
 
 	@Get('student/:studentId/homework')
 	async getHomeworkForStudent(@Param('studentId') studentId: string) {
-		return this.lessonsService.getHomeworkForStudent(studentId);
+		console.log(`📋 [GET] /student/${studentId}/homework вызван`);
+		const result = await this.lessonsService.getHomeworkForStudent(studentId);
+		console.log(`📋 [GET] /student/${studentId}/homework результат:`, result.length, 'домашних заданий');
+		return result;
 	}
 
 	@Get('teacher/:teacherId/homework')
 	async getHomeworkForTeacher(@Param('teacherId') teacherId: string) {
-		return this.lessonsService.getHomeworkForTeacher(teacherId);
+		console.log(`📋 [GET] /teacher/${teacherId}/homework вызван`);
+		const result = await this.lessonsService.getHomeworkForTeacher(teacherId);
+		console.log(`📋 [GET] /teacher/${teacherId}/homework результат:`, result.length, 'домашних заданий');
+		return result;
 	}
 
 	@Put('homework/:homeworkId/complete')
