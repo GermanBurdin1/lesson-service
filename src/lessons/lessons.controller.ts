@@ -223,6 +223,11 @@ export class LessonsController {
 		return this.lessonsService.getHomeworkForStudent(studentId);
 	}
 
+	@Get('teacher/:teacherId/homework')
+	async getHomeworkForTeacher(@Param('teacherId') teacherId: string) {
+		return this.lessonsService.getHomeworkForTeacher(teacherId);
+	}
+
 	@Put('homework/:homeworkId/complete')
 	async completeHomework(
 		@Param('homeworkId') homeworkId: string,

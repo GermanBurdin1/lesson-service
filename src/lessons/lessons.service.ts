@@ -1234,6 +1234,26 @@ export class LessonsService {
 		});
 	}
 
+	// Получение всех домашних заданий преподавателя
+	async getHomeworkForTeacher(teacherId: string) {
+		const lessons = await this.lessonRepo.find({
+			where: { teacherId },
+			select: ['id']
+		});
+
+		const lessonIds = lessons.map(lesson => lesson.id);
+		
+		if (lessonIds.length === 0) {
+			return [];
+		}
+
+		return this.homeworkRepo.find({
+			where: { lessonId: In(lessonIds) },
+			order: { dueDate: 'ASC' },
+			relations: ['lesson']
+		});
+	}
+
 	// Отметка домашнего задания как выполненного
 	async completeHomework(homeworkId: string, completedBy: string) {
 		const homework = await this.homeworkRepo.findOneBy({ id: homeworkId });
