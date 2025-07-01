@@ -1216,6 +1216,8 @@ export class LessonsService {
 
 	// Получение всех домашних заданий студента
 	async getHomeworkForStudent(studentId: string) {
+		console.log(`📋 [SERVICE] getHomeworkForStudent вызван для studentId: ${studentId}`);
+		
 		const lessons = await this.lessonRepo.find({
 			where: { studentId },
 			select: ['id']
@@ -1224,14 +1226,28 @@ export class LessonsService {
 		const lessonIds = lessons.map(lesson => lesson.id);
 		
 		if (lessonIds.length === 0) {
+			console.log(`📋 [SERVICE] У студента нет уроков, возвращаем пустой массив`);
 			return [];
 		}
 
-		return this.homeworkRepo.find({
+		const homework = await this.homeworkRepo.find({
 			where: { lessonId: In(lessonIds) },
 			order: { dueDate: 'ASC' },
 			relations: ['lesson']
 		});
+
+		console.log(`📋 [SERVICE] Загружено ${homework.length} домашних заданий для студента`);
+		homework.forEach(hw => {
+			console.log(`📋 [SERVICE] Homework ${hw.id}:`, {
+				title: hw.title,
+				studentResponse: hw.studentResponse,
+				studentResponseType: typeof hw.studentResponse,
+				studentResponseLength: hw.studentResponse?.length,
+				status: hw.status
+			});
+		});
+
+		return homework;
 	}
 
 	// Получение всех домашних заданий преподавателя
@@ -1277,16 +1293,65 @@ export class LessonsService {
 	}
 
 	// Отметка элемента домашнего задания как выполненного
-	async completeHomeworkItem(homeworkId: string, completedBy: string) {
+	async completeHomeworkItem(homeworkId: string, completedBy: string, studentResponse?: string) {
+		console.log(`📝 [SERVICE] completeHomeworkItem вызван:`, {
+			homeworkId,
+			completedBy,
+			studentResponse,
+			studentResponseLength: studentResponse?.length
+		});
+
 		const homework = await this.homeworkRepo.findOneBy({ id: homeworkId });
 		if (!homework) {
 			throw new Error('Элемент домашнего задания не найден');
 		}
 
+		console.log(`📝 [SERVICE] Найдено домашнее задание:`, {
+			id: homework.id,
+			title: homework.title,
+			currentStudentResponse: homework.studentResponse
+		});
+
 		homework.isCompleted = true;
 		homework.status = 'finished';
 		homework.completedAt = new Date();
-		await this.homeworkRepo.save(homework);
+		homework.submittedAt = new Date();
+		
+		// Сохраняем ответ студента, если он предоставлен
+		if (studentResponse) {
+			homework.studentResponse = studentResponse;
+			console.log(`📝 [SERVICE] Устанавливаем studentResponse:`, studentResponse);
+		} else {
+			console.log(`📝 [SERVICE] studentResponse не предоставлен`);
+		}
+		
+		console.log(`📝 [SERVICE] Перед сохранением homework:`, {
+			id: homework.id,
+			studentResponse: homework.studentResponse,
+			studentResponseType: typeof homework.studentResponse,
+			status: homework.status,
+			isCompleted: homework.isCompleted
+		});
+		
+		const savedHomework = await this.homeworkRepo.save(homework);
+		
+		console.log(`📝 [SERVICE] После сохранения homework:`, {
+			id: savedHomework.id,
+			studentResponse: savedHomework.studentResponse,
+			studentResponseType: typeof savedHomework.studentResponse,
+			status: savedHomework.status,
+			isCompleted: savedHomework.isCompleted
+		});
+
+		// Дополнительная проверка - читаем из БД заново
+		const reloadedHomework = await this.homeworkRepo.findOneBy({ id: homeworkId });
+		console.log(`📝 [SERVICE] Перечитано из БД:`, {
+			id: reloadedHomework?.id,
+			studentResponse: reloadedHomework?.studentResponse,
+			studentResponseType: typeof reloadedHomework?.studentResponse,
+			status: reloadedHomework?.status,
+			isCompleted: reloadedHomework?.isCompleted
+		});
 
 		// Если это связано с оригинальной задачей, отмечаем и её
 		if (homework.originalItemId && homework.itemType === 'task') {
@@ -1298,7 +1363,7 @@ export class LessonsService {
 			}
 		}
 
-		return homework;
+		return savedHomework;
 	}
 
 	// Получение урока с полной информацией (включая заметки и домашние задания)
@@ -1322,6 +1387,22 @@ export class LessonsService {
 			notes,
 			homework
 		};
+	}
+
+	// Оценка домашнего задания преподавателем
+	async gradeHomeworkItem(homeworkId: string, grade: number, teacherFeedback?: string) {
+		const homework = await this.homeworkRepo.findOneBy({ id: homeworkId });
+		if (!homework) {
+			throw new Error('Элемент домашнего задания не найден');
+		}
+
+		homework.grade = grade;
+		if (teacherFeedback) {
+			homework.teacherFeedback = teacherFeedback;
+		}
+		
+		await this.homeworkRepo.save(homework);
+		return homework;
 	}
 
 	async completeQuestion(questionId: string, completedBy: string) {

@@ -39,6 +39,18 @@ export class HomeworkItem {
   @Column({ type: 'timestamp', nullable: true })
   completedAt: Date | null;
 
+  @Column('text', { nullable: true })
+  studentResponse: string | null; // Ответ студента на задание
+
+  @Column('text', { nullable: true })
+  teacherFeedback: string | null; // Комментарий преподавателя
+
+  @Column('decimal', { nullable: true, precision: 4, scale: 2 })
+  grade: number | null; // Оценка от 0 до 20 (с дробной частью)
+
+  @Column({ type: 'timestamp', nullable: true })
+  submittedAt: Date | null; // Дата отправки ответа студентом
+
   @CreateDateColumn()
   createdAt: Date;
 

@@ -250,9 +250,23 @@ export class LessonsController {
 	@Put('homework-item/:homeworkId/complete')
 	async completeHomeworkItem(
 		@Param('homeworkId') homeworkId: string,
-		@Body() body: { completedBy: string }
+		@Body() body: { completedBy: string; studentResponse?: string }
 	) {
-		return this.lessonsService.completeHomeworkItem(homeworkId, body.completedBy);
+		console.log(`📥 [PUT] /homework-item/${homeworkId}/complete получен:`, {
+			homeworkId,
+			body,
+			studentResponse: body.studentResponse,
+			studentResponseLength: body.studentResponse?.length
+		});
+		return this.lessonsService.completeHomeworkItem(homeworkId, body.completedBy, body.studentResponse);
+	}
+
+	@Put('homework-item/:homeworkId/grade')
+	async gradeHomeworkItem(
+		@Param('homeworkId') homeworkId: string,
+		@Body() body: { grade: number; teacherFeedback?: string }
+	) {
+		return this.lessonsService.gradeHomeworkItem(homeworkId, body.grade, body.teacherFeedback);
 	}
 
 	@Get(':id/full-details')
