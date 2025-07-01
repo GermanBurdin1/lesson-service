@@ -1269,8 +1269,34 @@ export class LessonsService {
 		}
 
 		homework.status = 'finished';
+		homework.isCompleted = true;
 		homework.completedAt = new Date();
 		await this.homeworkRepo.save(homework);
+
+		return homework;
+	}
+
+	// Отметка элемента домашнего задания как выполненного
+	async completeHomeworkItem(homeworkId: string, completedBy: string) {
+		const homework = await this.homeworkRepo.findOneBy({ id: homeworkId });
+		if (!homework) {
+			throw new Error('Элемент домашнего задания не найден');
+		}
+
+		homework.isCompleted = true;
+		homework.status = 'finished';
+		homework.completedAt = new Date();
+		await this.homeworkRepo.save(homework);
+
+		// Если это связано с оригинальной задачей, отмечаем и её
+		if (homework.originalItemId && homework.itemType === 'task') {
+			const originalTask = await this.taskRepo.findOneBy({ id: homework.originalItemId });
+			if (originalTask) {
+				originalTask.isCompleted = true;
+				originalTask.completedAt = new Date();
+				await this.taskRepo.save(originalTask);
+			}
+		}
 
 		return homework;
 	}
@@ -1296,6 +1322,17 @@ export class LessonsService {
 			notes,
 			homework
 		};
+	}
+
+	async completeQuestion(questionId: string, completedBy: string) {
+		const question = await this.questionRepo.findOneBy({ id: questionId });
+		if (!question) {
+			throw new Error('Вопрос не найден');
+		}
+		question.isCompleted = true;
+		question.completedAt = new Date();
+		await this.questionRepo.save(question);
+		return question;
 	}
 
 }

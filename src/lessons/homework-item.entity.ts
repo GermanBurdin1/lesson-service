@@ -27,6 +27,9 @@ export class HomeworkItem {
   @Column({ type: 'enum', enum: ['unfinished', 'finished'], default: 'unfinished' })
   status: 'unfinished' | 'finished';
 
+  @Column({ type: 'boolean', default: false })
+  isCompleted: boolean;
+
   @Column('uuid')
   createdBy: string; // teacherId or studentId
 

@@ -27,6 +27,12 @@ export class Question {
   @Column({ type: 'timestamp', nullable: true })
   answeredAt: Date | null;
 
+  @Column({ type: 'boolean', default: false })
+  isCompleted: boolean;
+
+  @Column({ type: 'timestamp', nullable: true })
+  completedAt: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

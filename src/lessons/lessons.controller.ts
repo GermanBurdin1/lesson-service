@@ -134,6 +134,11 @@ export class LessonsController {
 		return this.lessonsService.answerQuestion(questionId, body.answer, body.answeredBy);
 	}
 
+	@Put('questions/:questionId/complete')
+	async completeQuestion(@Param('questionId') questionId: string, @Body() body: { completedBy: string }) {
+		return this.lessonsService.completeQuestion(questionId, body.completedBy);
+	}
+
 	@Get(':id/details')
 	async getLessonWithTasksAndQuestions(@Param('id') lessonId: string) {
 		return this.lessonsService.getLessonWithTasksAndQuestions(lessonId);
@@ -240,6 +245,14 @@ export class LessonsController {
 		@Body() body: { completedBy: string }
 	) {
 		return this.lessonsService.completeHomework(homeworkId, body.completedBy);
+	}
+
+	@Put('homework-item/:homeworkId/complete')
+	async completeHomeworkItem(
+		@Param('homeworkId') homeworkId: string,
+		@Body() body: { completedBy: string }
+	) {
+		return this.lessonsService.completeHomeworkItem(homeworkId, body.completedBy);
 	}
 
 	@Get(':id/full-details')
