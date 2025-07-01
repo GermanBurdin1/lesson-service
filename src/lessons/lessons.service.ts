@@ -1220,7 +1220,7 @@ export class LessonsService {
 		
 		const lessons = await this.lessonRepo.find({
 			where: { studentId },
-			select: ['id']
+			select: ['id', 'studentId', 'teacherId']
 		});
 
 		const lessonIds = lessons.map(lesson => lesson.id);
@@ -1247,7 +1247,54 @@ export class LessonsService {
 			});
 		});
 
-		return homework;
+		// Получаем имена пользователей
+		const studentIds = [...new Set(lessons.map(lesson => lesson.studentId))];
+		const teacherIds = [...new Set(lessons.map(lesson => lesson.teacherId))];
+		
+		try {
+			// Получаем профили всех пользователей
+			const allUserIds = [...new Set([...studentIds, ...teacherIds])];
+			const userProfiles = await Promise.all(
+				allUserIds.map(userId => this.authClient.getUserInfo(userId).catch(() => null))
+			);
+
+			// Создаем мапу для быстрого поиска имен
+			const userNameMap = new Map();
+			userProfiles.forEach((profile) => {
+				if (profile) {
+					userNameMap.set(profile.id, `${profile.name || ''} ${profile.surname || ''}`.trim());
+				}
+			});
+
+			// Обогащаем homework данными о пользователях
+			const enrichedHomework = homework.map(hw => {
+				const lesson = lessons.find(l => l.id === hw.lessonId);
+				return {
+					...hw,
+					assignedBy: lesson?.teacherId,
+					assignedByName: userNameMap.get(lesson?.teacherId) || 'Enseignant inconnu',
+					assignedTo: lesson?.studentId,
+					assignedToName: userNameMap.get(lesson?.studentId) || 'Étudiant inconnu',
+					assignedAt: hw.createdAt
+				};
+			});
+
+			return enrichedHomework;
+		} catch (error) {
+			console.error('❌ [SERVICE] Ошибка получения профилей пользователей:', error);
+			// Возвращаем homework без имен в случае ошибки
+			return homework.map(hw => {
+				const lesson = lessons.find(l => l.id === hw.lessonId);
+				return {
+					...hw,
+					assignedBy: lesson?.teacherId,
+					assignedByName: 'Enseignant',
+					assignedTo: lesson?.studentId,
+					assignedToName: 'Étudiant',
+					assignedAt: hw.createdAt
+				};
+			});
+		}
 	}
 
 	// Получение всех домашних заданий преподавателя
@@ -1256,7 +1303,7 @@ export class LessonsService {
 		
 		const lessons = await this.lessonRepo.find({
 			where: { teacherId },
-			select: ['id']
+			select: ['id', 'studentId', 'teacherId']
 		});
 
 		console.log(`📋 [SERVICE] Найдено ${lessons.length} уроков для преподавателя ${teacherId}`);
@@ -1274,7 +1321,55 @@ export class LessonsService {
 		});
 
 		console.log(`📋 [SERVICE] Найдено ${homework.length} домашних заданий для преподавателя ${teacherId}`);
-		return homework;
+		
+		// Получаем имена пользователей
+		const studentIds = [...new Set(lessons.map(lesson => lesson.studentId))];
+		const teacherIds = [...new Set(lessons.map(lesson => lesson.teacherId))];
+		
+		try {
+			// Получаем профили всех пользователей
+			const allUserIds = [...new Set([...studentIds, ...teacherIds])];
+			const userProfiles = await Promise.all(
+				allUserIds.map(userId => this.authClient.getUserInfo(userId).catch(() => null))
+			);
+
+			// Создаем мапу для быстрого поиска имен
+			const userNameMap = new Map();
+			userProfiles.forEach((profile) => {
+				if (profile) {
+					userNameMap.set(profile.id, `${profile.name || ''} ${profile.surname || ''}`.trim());
+				}
+			});
+
+			// Обогащаем homework данными о пользователях
+			const enrichedHomework = homework.map(hw => {
+				const lesson = lessons.find(l => l.id === hw.lessonId);
+				return {
+					...hw,
+					assignedBy: lesson?.teacherId,
+					assignedByName: userNameMap.get(lesson?.teacherId) || 'Enseignant inconnu',
+					assignedTo: lesson?.studentId,
+					assignedToName: userNameMap.get(lesson?.studentId) || 'Étudiant inconnu',
+					assignedAt: hw.createdAt
+				};
+			});
+
+			return enrichedHomework;
+		} catch (error) {
+			console.error('❌ [SERVICE] Ошибка получения профилей пользователей:', error);
+			// Возвращаем homework без имен в случае ошибки
+			return homework.map(hw => {
+				const lesson = lessons.find(l => l.id === hw.lessonId);
+				return {
+					...hw,
+					assignedBy: lesson?.teacherId,
+					assignedByName: 'Enseignant',
+					assignedTo: lesson?.studentId,
+					assignedToName: 'Étudiant',
+					assignedAt: hw.createdAt
+				};
+			});
+		}
 	}
 
 	// Отметка домашнего задания как выполненного
