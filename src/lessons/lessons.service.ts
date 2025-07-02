@@ -10,7 +10,7 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { AuthClient } from '../auth/auth.client';
 import { HttpService } from '@nestjs/axios';
 import { lastValueFrom } from 'rxjs';
-import { In, Between } from 'typeorm';
+import { In, Between, Like, ILike } from 'typeorm';
 
 @Injectable()
 export class LessonsService {
@@ -1537,37 +1537,28 @@ export class LessonsService {
 		try {
 			console.log(`📊 Getting lessons stats from ${startDate.toISOString()} to ${endDate.toISOString()}`);
 
-			// Общее количество уроков за период
-			const totalLessons = await this.lessonRepo.count({
-				where: {
-					scheduledAt: {
-						$gte: startDate,
-						$lte: endDate
-					} as any
-				}
-			});
+					// Общее количество уроков за период
+		const totalLessons = await this.lessonRepo.count({
+			where: {
+				scheduledAt: Between(startDate, endDate)
+			}
+		});
 
-			// Завершенные уроки
-			const completedLessons = await this.lessonRepo.count({
-				where: {
-					scheduledAt: {
-						$gte: startDate,
-						$lte: endDate
-					} as any,
-					status: 'completed'
-				}
-			});
+		// Завершенные уроки
+		const completedLessons = await this.lessonRepo.count({
+			where: {
+				scheduledAt: Between(startDate, endDate),
+				status: 'completed'
+			}
+		});
 
-			// Отмененные уроки
-			const cancelledLessons = await this.lessonRepo.count({
-				where: {
-					scheduledAt: {
-						$gte: startDate,
-						$lte: endDate
-					} as any,
-					status: { $like: '%cancelled%' } as any
-				}
-			});
+		// Отмененные уроки
+		const cancelledLessons = await this.lessonRepo.count({
+			where: {
+				scheduledAt: Between(startDate, endDate),
+				status: In(['cancelled_by_student', 'cancelled_by_student_no_refund'])
+			}
+		});
 
 			console.log(`📊 Lessons stats: total=${totalLessons}, completed=${completedLessons}, cancelled=${cancelledLessons}`);
 
