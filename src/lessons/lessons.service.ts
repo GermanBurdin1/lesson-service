@@ -1530,4 +1530,96 @@ export class LessonsService {
 		return count;
 	}
 
+	/**
+	 * Получить статистику уроков за заданный период (для админа)
+	 */
+	async getLessonsStats(startDate: Date, endDate: Date) {
+		try {
+			console.log(`📊 Getting lessons stats from ${startDate.toISOString()} to ${endDate.toISOString()}`);
+
+			// Общее количество уроков за период
+			const totalLessons = await this.lessonRepo.count({
+				where: {
+					scheduledAt: {
+						$gte: startDate,
+						$lte: endDate
+					} as any
+				}
+			});
+
+			// Завершенные уроки
+			const completedLessons = await this.lessonRepo.count({
+				where: {
+					scheduledAt: {
+						$gte: startDate,
+						$lte: endDate
+					} as any,
+					status: 'completed'
+				}
+			});
+
+			// Отмененные уроки
+			const cancelledLessons = await this.lessonRepo.count({
+				where: {
+					scheduledAt: {
+						$gte: startDate,
+						$lte: endDate
+					} as any,
+					status: { $like: '%cancelled%' } as any
+				}
+			});
+
+			console.log(`📊 Lessons stats: total=${totalLessons}, completed=${completedLessons}, cancelled=${cancelledLessons}`);
+
+			return {
+				totalLessons,
+				completedLessons,
+				cancelledLessons,
+				successRate: totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0,
+				period: {
+					startDate: startDate.toISOString(),
+					endDate: endDate.toISOString()
+				}
+			};
+		} catch (error) {
+			console.error('❌ Error getting lessons stats:', error);
+			
+			// Fallback to raw SQL if TypeORM fails
+			try {
+				const result = await this.lessonRepo.query(`
+					SELECT 
+						COUNT(*) as total_lessons,
+						COUNT(*) FILTER (WHERE status = 'completed') as completed_lessons,
+						COUNT(*) FILTER (WHERE status LIKE '%cancelled%') as cancelled_lessons
+					FROM lessons 
+					WHERE "scheduledAt" BETWEEN $1 AND $2
+				`, [startDate, endDate]);
+
+				const stats = result[0];
+				const total = parseInt(stats.total_lessons) || 0;
+				const completed = parseInt(stats.completed_lessons) || 0;
+				const cancelled = parseInt(stats.cancelled_lessons) || 0;
+				
+				return {
+					totalLessons: total,
+					completedLessons: completed,
+					cancelledLessons: cancelled,
+					successRate: total > 0 ? Math.round((completed / total) * 100) : 0,
+					period: {
+						startDate: startDate.toISOString(),
+						endDate: endDate.toISOString()
+					}
+				};
+			} catch (sqlError) {
+				console.error('❌ Raw SQL also failed:', sqlError);
+				return { 
+					totalLessons: 0, 
+					completedLessons: 0, 
+					cancelledLessons: 0,
+					successRate: 0
+				};
+			}
+		}
+	}
+
 }

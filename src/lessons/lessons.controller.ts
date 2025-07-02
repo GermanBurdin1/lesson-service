@@ -166,6 +166,19 @@ export class LessonsController {
 		return { count };
 	}
 
+	/**
+	 * Получить статистику уроков за заданный период для админа
+	 */
+	@Get('stats')
+	async getLessonsStats(
+		@Query('startDate') startDate: string,
+		@Query('endDate') endDate: string
+	) {
+		console.log(`📥 [GET] /stats получен с датами: ${startDate} - ${endDate}`);
+		const stats = await this.lessonsService.getLessonsStats(new Date(startDate), new Date(endDate));
+		return stats;
+	}
+
 	// ==================== ОБЩИЙ ENDPOINT (должен быть ПОСЛЕДНИМ) ====================
 
 	@Get(':id')
