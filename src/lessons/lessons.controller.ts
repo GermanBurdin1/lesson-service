@@ -154,6 +154,18 @@ export class LessonsController {
 		return this.lessonsService.getQuestionsForLesson(lessonId);
 	}
 
+	// ==================== ЭНДПОИНТ ДЛЯ СТАТИСТИКИ (ДОЛЖЕН БЫТЬ ВЫШЕ :id) ====================
+
+	/**
+	 * Получить количество завершенных уроков для студента
+	 */
+	@Get('completed/count/:studentId')
+	async getCompletedLessonsCount(@Param('studentId') studentId: string) {
+		console.log(`📥 [GET] /completed/count/${studentId} получен`);
+		const count = await this.lessonsService.getCompletedLessonsCount(studentId);
+		return { count };
+	}
+
 	// ==================== ОБЩИЙ ENDPOINT (должен быть ПОСЛЕДНИМ) ====================
 
 	@Get(':id')

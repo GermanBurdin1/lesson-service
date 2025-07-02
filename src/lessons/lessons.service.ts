@@ -1511,4 +1511,23 @@ export class LessonsService {
 		return question;
 	}
 
+	// ==================== МЕТОДЫ ДЛЯ СТАТИСТИКИ ====================
+
+	/**
+	 * Получить количество завершенных уроков для студента
+	 */
+	async getCompletedLessonsCount(studentId: string): Promise<number> {
+		console.log(`📊 Подсчет завершенных уроков для студента: ${studentId}`);
+		
+		const count = await this.lessonRepo.count({
+			where: {
+				studentId,
+				status: 'completed'
+			}
+		});
+
+		console.log(`📊 Найдено завершенных уроков: ${count}`);
+		return count;
+	}
+
 }
