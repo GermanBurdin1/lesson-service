@@ -298,5 +298,4 @@ export class LessonsController {
 	async getLessonWithFullDetails(@Param('id') lessonId: string) {
 		return this.lessonsService.getLessonWithFullDetails(lessonId);
 	}
-
 }

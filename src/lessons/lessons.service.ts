@@ -43,16 +43,16 @@ export class LessonsService {
 	async bookLesson(studentId: string, teacherId: string, scheduledAt: Date) {
 		// ==================== ВАЛИДАЦИЯ ВРЕМЕНИ УРОКА ====================
 		console.log(`🔍 Проверка времени урока для преподавателя ${teacherId} и студента ${studentId} на время ${scheduledAt}`);
-		
-		// Используем новую централизованную валидацию
-		    // Проверка, что время не в прошлом
-    const now = new Date();
-    if (scheduledAt <= now) {
-      throw new Error('Impossible de réserver un créneau dans le passé');
-    }
 
-    await this.validateLessonTime(teacherId, studentId, scheduledAt);
-		
+		// Используем новую централизованную валидацию
+		// Проверка, что время не в прошлом
+		const now = new Date();
+		if (scheduledAt <= now) {
+			throw new Error('Impossible de réserver un créneau dans le passé');
+		}
+
+		await this.validateLessonTime(teacherId, studentId, scheduledAt);
+
 		// Проверяем дублирование заявок от одного студента на одно время
 		const existingStudentRequests = await this.lessonRepo.find({
 			where: [
@@ -60,14 +60,14 @@ export class LessonsService {
 				{ studentId, scheduledAt, status: 'confirmed' }
 			]
 		});
-		
+
 		if (existingStudentRequests.length > 0) {
 			console.log(`❌ Студент ${studentId} уже имеет заявку/урок на это время`);
 			throw new Error('Vous avez déjà une demande ou un cours programmé à cette heure.');
 		}
-		
+
 		console.log(`✅ Проверка времени урока завершена успешно`);
-		
+
 		// ==================== СОЗДАНИЕ УРОКА ====================
 		const lesson = this.lessonRepo.create({
 			studentId,
@@ -130,18 +130,18 @@ export class LessonsService {
 			lesson.studentConfirmed = null;
 			lesson.studentRefused = null;
 			await this.lessonRepo.save(lesson);
-			
+
 			// Получаем информацию о преподавателе для уведомления
 			const teacher = await this.authClient.getUserInfo(lesson.teacherId);
 			const teacherName = `${teacher?.name ?? ''} ${teacher?.surname ?? ''}`.trim();
-			
+
 			await this.amqp.publish('lesson_exchange', 'lesson_response', {
 				user_id: lesson.studentId,
 				title: 'Le professeur propose un autre horaire',
 				message: `Le professeur propose le ${lesson.proposedTime.toLocaleString('fr-FR')}.`,
 				type: 'booking_proposal',
-				metadata: { 
-					lessonId: lesson.id, 
+				metadata: {
+					lessonId: lesson.id,
 					proposedTime: lesson.proposedTime,
 					teacherId: lesson.teacherId,
 					teacherName: teacherName
@@ -234,7 +234,7 @@ export class LessonsService {
 				await lastValueFrom(
 					this.httpService.patch(
 						`http://localhost:3003/notifications/${notification.id}`,
-						{ 
+						{
 							status: accepted ? 'accepted' : 'refused',
 							data: updatedData
 						}
@@ -258,14 +258,14 @@ export class LessonsService {
 			lesson.studentConfirmed = true;
 			lesson.studentRefused = false;
 			await this.lessonRepo.save(lesson);
-			
+
 			await this.amqp.publish('lesson_exchange', 'lesson_response', {
 				user_id: lesson.teacherId,
 				title: `${studentName} a accepté la proposition`,
 				message: `${studentName} a accepté la proposition pour le ${lesson.proposedTime?.toLocaleString('fr-FR')}.`,
 				type: 'booking_proposal_accepted',
-				metadata: { 
-					lessonId: lesson.id, 
+				metadata: {
+					lessonId: lesson.id,
 					proposedTime: lesson.proposedTime,
 					studentId: lesson.studentId,
 					studentName: studentName
@@ -278,14 +278,14 @@ export class LessonsService {
 			lesson.studentConfirmed = false;
 			lesson.studentRefused = true;
 			await this.lessonRepo.save(lesson);
-			
+
 			await this.amqp.publish('lesson_exchange', 'lesson_response', {
 				user_id: lesson.teacherId,
 				title: `${studentName} propose un autre horaire`,
 				message: `${studentName} propose le ${lesson.studentAlternativeTime.toLocaleString('fr-FR')}.`,
 				type: 'booking_proposal_counter',
-				metadata: { 
-					lessonId: lesson.id, 
+				metadata: {
+					lessonId: lesson.id,
 					proposedTime: lesson.studentAlternativeTime,
 					studentId: lesson.studentId,
 					studentName: studentName
@@ -298,13 +298,13 @@ export class LessonsService {
 			lesson.studentConfirmed = false;
 			lesson.studentRefused = true;
 			await this.lessonRepo.save(lesson);
-			
+
 			await this.amqp.publish('lesson_exchange', 'lesson_response', {
 				user_id: lesson.teacherId,
 				title: `${studentName} a refusé la proposition`,
 				message: `${studentName} a refusé la proposition.`,
 				type: 'booking_proposal_refused',
-				metadata: { 
+				metadata: {
 					lessonId: lesson.id,
 					studentId: lesson.studentId,
 					studentName: studentName
@@ -428,9 +428,9 @@ export class LessonsService {
 		}
 
 		const lessons = await this.lessonRepo.find({
-			where: { 
-				teacherId, 
-				status: In(['confirmed', 'cancelled_by_student', 'cancelled_by_student_no_refund', 'in_progress', 'completed']) 
+			where: {
+				teacherId,
+				status: In(['confirmed', 'cancelled_by_student', 'cancelled_by_student_no_refund', 'in_progress', 'completed'])
 			},
 			order: { scheduledAt: 'ASC' }
 		});
@@ -527,11 +527,11 @@ export class LessonsService {
 		await this.amqp.publish('lesson_exchange', 'lesson_cancelled', payload);
 
 		console.log(`✅ [END] Урок отменен со статусом: ${cancellationStatus}`);
-		return { 
-			success: true, 
+		return {
+			success: true,
 			status: cancellationStatus,
 			refundAvailable: !isWithinTwoHours,
-			message: isWithinTwoHours 
+			message: isWithinTwoHours
 				? 'Урок отменен. Так как отмена произошла менее чем за 2 часа до начала, возврат средств не производится.'
 				: 'Урок отменен. Возврат средств будет произведен в течение 3-5 рабочих дней.'
 		};
@@ -554,11 +554,11 @@ export class LessonsService {
 		};
 	}[]> {
 		console.log(`🔍 Получение полного расписания преподавателя ${teacherId} на дату ${date.toDateString()}`);
-		
+
 		// Получаем все занятия преподавателя на указанную дату
 		const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0);
 		const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59);
-		
+
 		const bookedLessons = await this.lessonRepo.find({
 			where: {
 				teacherId,
@@ -591,21 +591,21 @@ export class LessonsService {
 		const slots = [];
 		const baseDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 		const now = new Date();
-		
+
 		for (let hour = 8; hour <= 21; hour++) {
 			for (let minute = 0; minute < 60; minute += 30) {
 				const slotTime = new Date(baseDate.getTime() + hour * 60 * 60 * 1000 + minute * 60 * 1000);
-				
+
 				// Пропускаем прошедшие слоты, если это сегодняшний день
 				if (slotTime <= now) {
 					continue;
 				}
-				
+
 				const timeString = slotTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-				
+
 				// Анализируем тип слота
 				const slotInfo = this.analyzeTimeSlot(slotTime, lessonsWithStudents);
-				
+
 				slots.push({
 					time: timeString,
 					...slotInfo
@@ -615,14 +615,14 @@ export class LessonsService {
 
 		// Группируем доступные слоты в интервалы
 		const slotsWithIntervals = this.groupAvailableSlots(slots);
-		
+
 		console.log(`✅ Сгенерировано ${slots.length} слотов:`, {
 			available: slots.filter(s => s.available).length,
 			lessons: slots.filter(s => s.type === 'lesson').length,
 			breaks: slots.filter(s => s.type === 'break').length,
 			blocked: slots.filter(s => s.type === 'blocked').length
 		});
-		
+
 		return slotsWithIntervals;
 	}
 
@@ -635,11 +635,11 @@ export class LessonsService {
 		lessonId?: string;
 	} {
 		const slotEnd = new Date(slotTime.getTime() + 60 * 60 * 1000); // Проверяем час от начала слота
-		
+
 		for (const lesson of lessonsWithStudents) {
 			const lessonStart = new Date(lesson.scheduledAt);
 			const lessonEnd = new Date(lessonStart.getTime() + 60 * 60 * 1000);
-			
+
 			// Проверяем, попадает ли слот в урок
 			if (slotTime >= lessonStart && slotTime < lessonEnd) {
 				return {
@@ -650,7 +650,7 @@ export class LessonsService {
 					lessonId: lesson.id
 				};
 			}
-			
+
 			// Проверяем, попадает ли слот в перерыв (15 минут до урока)
 			const breakStart = new Date(lessonStart.getTime() - 15 * 60 * 1000);
 			if (slotTime >= breakStart && slotTime < lessonStart) {
@@ -660,7 +660,7 @@ export class LessonsService {
 					reason: `Préparation (cours dans ${Math.round((lessonStart.getTime() - slotTime.getTime()) / (1000 * 60))} min)`
 				};
 			}
-			
+
 			// Проверяем, попадает ли слот в перерыв (15 минут после урока)
 			const breakEnd = new Date(lessonEnd.getTime() + 15 * 60 * 1000);
 			if (slotTime >= lessonEnd && slotTime < breakEnd) {
@@ -670,7 +670,7 @@ export class LessonsService {
 					reason: `Pause (après cours avec ${lesson.studentName})`
 				};
 			}
-			
+
 			// Проверяем пересечение с учетом полной блокировки
 			if (slotTime < breakEnd && slotEnd > breakStart) {
 				return {
@@ -680,7 +680,7 @@ export class LessonsService {
 				};
 			}
 		}
-		
+
 		return {
 			available: true,
 			type: 'available'
@@ -690,13 +690,13 @@ export class LessonsService {
 	// Группировка доступных слотов в интервалы
 	private groupAvailableSlots(slots: any[]): any[] {
 		const result = [...slots];
-		
+
 		// Найдем доступные интервалы и добавим информацию о продолжительности
 		let currentInterval: { start: string; startIndex: number } | null = null;
-		
+
 		for (let i = 0; i < result.length; i++) {
 			const slot = result[i];
-			
+
 			if (slot.available && slot.type === 'available') {
 				// Начинаем новый интервал
 				if (!currentInterval) {
@@ -707,7 +707,7 @@ export class LessonsService {
 				if (currentInterval) {
 					const duration = (i - currentInterval.startIndex) * 30; // каждый слот 30 минут
 					const endTime = i > 0 ? result[i - 1].time : slot.time;
-					
+
 					// Добавляем информацию об интервале ко всем слотам в этом интервале
 					for (let j = currentInterval.startIndex; j < i; j++) {
 						result[j].interval = {
@@ -716,12 +716,12 @@ export class LessonsService {
 							duration
 						};
 					}
-					
+
 					currentInterval = null;
 				}
 			}
 		}
-		
+
 		// Обрабатываем последний интервал, если он остался открытым
 		if (currentInterval) {
 			const duration = (result.length - currentInterval.startIndex) * 30;
@@ -733,7 +733,7 @@ export class LessonsService {
 				};
 			}
 		}
-		
+
 		return result;
 	}
 
@@ -749,23 +749,23 @@ export class LessonsService {
 	// Проверка доступности временного слота (устаревший метод, оставлен для совместимости)
 	private isSlotAvailable(slotTime: Date, bookedLessons: Lesson[]): boolean {
 		const slotEnd = new Date(slotTime.getTime() + 60 * 60 * 1000); // Урок длится 1 час
-		
+
 		for (const lesson of bookedLessons) {
 			const lessonStart = new Date(lesson.scheduledAt);
 			const lessonEnd = new Date(lessonStart.getTime() + 60 * 60 * 1000);
-			
+
 			// Блокируем 15 минут до и после урока
 			const blockStart = new Date(lessonStart.getTime() - 15 * 60 * 1000);
 			const blockEnd = new Date(lessonEnd.getTime() + 15 * 60 * 1000);
-			
+
 			// Проверяем пересечение с заблокированным временем
 			const hasConflict = slotTime < blockEnd && slotEnd > blockStart;
-			
+
 			if (hasConflict) {
 				return false; // Слот недоступен
 			}
 		}
-		
+
 		return true; // Слот доступен
 	}
 
@@ -799,7 +799,7 @@ export class LessonsService {
 		});
 
 		// Исключаем текущий урок если редактируем
-		const filteredLessons = excludeLessonId 
+		const filteredLessons = excludeLessonId
 			? existingLessons.filter(lesson => lesson.id !== excludeLessonId)
 			: existingLessons;
 
@@ -818,7 +818,7 @@ export class LessonsService {
 
 			// Проверяем минимальный перерыв 15 минут
 			const timeDiffMinutes = Math.abs(lessonStart.getTime() - existingStart.getTime()) / (1000 * 60);
-			
+
 			if (timeDiffMinutes < 75) { // 60 мин урок + 15 мин перерыв
 				const conflictTime = existingStart.toLocaleString('fr-FR');
 				const participantName = existingLesson.teacherId === teacherId ? 'ce professeur' : 'cet étudiant';
@@ -854,7 +854,7 @@ export class LessonsService {
 		// Уведомляем другого участника о начале урока
 		const isStartedByTeacher = lesson.teacherId === startedBy;
 		const notificationTargetId = isStartedByTeacher ? lesson.studentId : lesson.teacherId;
-		
+
 		const user = await this.authClient.getUserInfo(startedBy);
 		const starterName = `${user?.name ?? ''} ${user?.surname ?? ''}`.trim();
 		const starterRole = isStartedByTeacher ? 'professeur' : 'étudiant';
@@ -951,7 +951,7 @@ export class LessonsService {
 		// Уведомляем другого участника о новой задаче
 		const isCreatedByTeacher = createdByRole === 'teacher';
 		const notificationTargetId = isCreatedByTeacher ? lesson.studentId : lesson.teacherId;
-		
+
 		const user = await this.authClient.getUserInfo(createdBy);
 		const creatorName = `${user?.name ?? ''} ${user?.surname ?? ''}`.trim();
 
@@ -998,7 +998,7 @@ export class LessonsService {
 		// Уведомляем другого участника о новом вопросе
 		const isCreatedByTeacher = createdByRole === 'teacher';
 		const notificationTargetId = isCreatedByTeacher ? lesson.studentId : lesson.teacherId;
-		
+
 		const user = await this.authClient.getUserInfo(createdBy);
 		const creatorName = `${user?.name ?? ''} ${user?.surname ?? ''}`.trim();
 
@@ -1070,27 +1070,27 @@ export class LessonsService {
 	}
 
 	// ==================== ОТСЛЕЖИВАНИЕ ЗАЯВОК СТУДЕНТА ====================
-	
+
 	async getStudentSentRequests(studentId: string) {
 		console.log(`📋 Получение отправленных заявок для студента ${studentId}`);
-		
+
 		// Валидация UUID
 		if (!this.validateUUID(studentId)) {
 			console.error(`❌ Invalid studentId UUID format: ${studentId}`);
 			throw new Error('Invalid student ID format');
 		}
-		
+
 		const lessons = await this.lessonRepo.find({
 			where: { studentId },
 			order: { createdAt: 'DESC' } // Сортировка по времени отправки (новые сначала)
 		});
-		
+
 		// Обогащаем данные информацией о преподавателях
 		const enrichedLessons = await Promise.all(
 			lessons.map(async (lesson) => {
 				const teacher = await this.authClient.getUserInfo(lesson.teacherId);
 				const teacherName = `${teacher?.name ?? ''} ${teacher?.surname ?? ''}`.trim();
-				
+
 				return {
 					lessonId: lesson.id,
 					teacherId: lesson.teacherId,
@@ -1105,7 +1105,7 @@ export class LessonsService {
 				};
 			})
 		);
-		
+
 		console.log(`📋 Найдено ${enrichedLessons.length} заявок для студента`);
 		return enrichedLessons;
 	}
@@ -1178,7 +1178,7 @@ export class LessonsService {
 
 		// Уведомляем студента о новом домашнем задании
 		const notificationTargetId = lesson.studentId;
-		
+
 		const user = await this.authClient.getUserInfo(createdBy);
 		const creatorName = `${user?.name ?? ''} ${user?.surname ?? ''}`.trim();
 
@@ -1217,14 +1217,14 @@ export class LessonsService {
 	// Получение всех домашних заданий студента
 	async getHomeworkForStudent(studentId: string) {
 		console.log(`📋 [SERVICE] getHomeworkForStudent вызван для studentId: ${studentId}`);
-		
+
 		const lessons = await this.lessonRepo.find({
 			where: { studentId },
 			select: ['id', 'studentId', 'teacherId']
 		});
 
 		const lessonIds = lessons.map(lesson => lesson.id);
-		
+
 		if (lessonIds.length === 0) {
 			console.log(`📋 [SERVICE] У студента нет уроков, возвращаем пустой массив`);
 			return [];
@@ -1250,7 +1250,7 @@ export class LessonsService {
 		// Получаем имена пользователей
 		const studentIds = [...new Set(lessons.map(lesson => lesson.studentId))];
 		const teacherIds = [...new Set(lessons.map(lesson => lesson.teacherId))];
-		
+
 		try {
 			// Получаем профили всех пользователей
 			const allUserIds = [...new Set([...studentIds, ...teacherIds])];
@@ -1300,7 +1300,7 @@ export class LessonsService {
 	// Получение всех домашних заданий преподавателя
 	async getHomeworkForTeacher(teacherId: string) {
 		console.log(`📋 [SERVICE] getHomeworkForTeacher вызван для teacherId: ${teacherId}`);
-		
+
 		const lessons = await this.lessonRepo.find({
 			where: { teacherId },
 			select: ['id', 'studentId', 'teacherId']
@@ -1308,7 +1308,7 @@ export class LessonsService {
 
 		console.log(`📋 [SERVICE] Найдено ${lessons.length} уроков для преподавателя ${teacherId}`);
 		const lessonIds = lessons.map(lesson => lesson.id);
-		
+
 		if (lessonIds.length === 0) {
 			console.log(`📋 [SERVICE] У преподавателя нет уроков, возвращаем пустой массив`);
 			return [];
@@ -1321,11 +1321,11 @@ export class LessonsService {
 		});
 
 		console.log(`📋 [SERVICE] Найдено ${homework.length} домашних заданий для преподавателя ${teacherId}`);
-		
+
 		// Получаем имена пользователей
 		const studentIds = [...new Set(lessons.map(lesson => lesson.studentId))];
 		const teacherIds = [...new Set(lessons.map(lesson => lesson.teacherId))];
-		
+
 		try {
 			// Получаем профили всех пользователей
 			const allUserIds = [...new Set([...studentIds, ...teacherIds])];
@@ -1411,7 +1411,7 @@ export class LessonsService {
 		homework.status = 'finished';
 		homework.completedAt = new Date();
 		homework.submittedAt = new Date();
-		
+
 		// Сохраняем ответ студента, если он предоставлен
 		if (studentResponse) {
 			homework.studentResponse = studentResponse;
@@ -1419,7 +1419,7 @@ export class LessonsService {
 		} else {
 			console.log(`📝 [SERVICE] studentResponse не предоставлен`);
 		}
-		
+
 		console.log(`📝 [SERVICE] Перед сохранением homework:`, {
 			id: homework.id,
 			studentResponse: homework.studentResponse,
@@ -1427,9 +1427,9 @@ export class LessonsService {
 			status: homework.status,
 			isCompleted: homework.isCompleted
 		});
-		
+
 		const savedHomework = await this.homeworkRepo.save(homework);
-		
+
 		console.log(`📝 [SERVICE] После сохранения homework:`, {
 			id: savedHomework.id,
 			studentResponse: savedHomework.studentResponse,
@@ -1495,7 +1495,7 @@ export class LessonsService {
 		if (teacherFeedback) {
 			homework.teacherFeedback = teacherFeedback;
 		}
-		
+
 		await this.homeworkRepo.save(homework);
 		return homework;
 	}
@@ -1518,7 +1518,7 @@ export class LessonsService {
 	 */
 	async getCompletedLessonsCount(studentId: string): Promise<number> {
 		console.log(`📊 Подсчет завершенных уроков для студента: ${studentId}`);
-		
+
 		const count = await this.lessonRepo.count({
 			where: {
 				studentId,
@@ -1537,28 +1537,28 @@ export class LessonsService {
 		try {
 			console.log(`📊 Getting lessons stats from ${startDate.toISOString()} to ${endDate.toISOString()}`);
 
-					// Общее количество уроков за период
-		const totalLessons = await this.lessonRepo.count({
-			where: {
-				scheduledAt: Between(startDate, endDate)
-			}
-		});
+			// Общее количество уроков за период
+			const totalLessons = await this.lessonRepo.count({
+				where: {
+					scheduledAt: Between(startDate, endDate)
+				}
+			});
 
-		// Завершенные уроки
-		const completedLessons = await this.lessonRepo.count({
-			where: {
-				scheduledAt: Between(startDate, endDate),
-				status: 'completed'
-			}
-		});
+			// Завершенные уроки
+			const completedLessons = await this.lessonRepo.count({
+				where: {
+					scheduledAt: Between(startDate, endDate),
+					status: 'completed'
+				}
+			});
 
-		// Отмененные уроки
-		const cancelledLessons = await this.lessonRepo.count({
-			where: {
-				scheduledAt: Between(startDate, endDate),
-				status: In(['cancelled_by_student', 'cancelled_by_student_no_refund'])
-			}
-		});
+			// Отмененные уроки
+			const cancelledLessons = await this.lessonRepo.count({
+				where: {
+					scheduledAt: Between(startDate, endDate),
+					status: In(['cancelled_by_student', 'cancelled_by_student_no_refund'])
+				}
+			});
 
 			console.log(`📊 Lessons stats: total=${totalLessons}, completed=${completedLessons}, cancelled=${cancelledLessons}`);
 
@@ -1574,7 +1574,7 @@ export class LessonsService {
 			};
 		} catch (error) {
 			console.error('❌ Error getting lessons stats:', error);
-			
+
 			// Fallback to raw SQL if TypeORM fails
 			try {
 				const result = await this.lessonRepo.query(`
@@ -1590,7 +1590,7 @@ export class LessonsService {
 				const total = parseInt(stats.total_lessons) || 0;
 				const completed = parseInt(stats.completed_lessons) || 0;
 				const cancelled = parseInt(stats.cancelled_lessons) || 0;
-				
+
 				return {
 					totalLessons: total,
 					completedLessons: completed,
@@ -1603,14 +1603,13 @@ export class LessonsService {
 				};
 			} catch (sqlError) {
 				console.error('❌ Raw SQL also failed:', sqlError);
-				return { 
-					totalLessons: 0, 
-					completedLessons: 0, 
+				return {
+					totalLessons: 0,
+					completedLessons: 0,
 					cancelledLessons: 0,
 					successRate: 0
 				};
 			}
 		}
 	}
-
 }
