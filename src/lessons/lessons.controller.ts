@@ -56,6 +56,16 @@ export class LessonsController {
 		return this.lessonsService.getStudentSentRequests(studentId);
 	}
 
+	@Get('student/:studentId/sent-requests-paged')
+	async getStudentSentRequestsPaged(
+		@Param('studentId') studentId: string,
+		@Query('page') page: number = 1,
+		@Query('limit') limit: number = 10
+	) {
+		console.log(`📥 [GET] /student/:studentId/sent-requests-paged получен для studentId: ${studentId}, page: ${page}, limit: ${limit}`);
+		return this.lessonsService.getStudentSentRequestsPaged(studentId, Number(page), Number(limit));
+	}
+
 	@Get('teacher/:teacherId/confirmed-students')
 	async getConfirmedStudentsForTeacher(@Param('teacherId') teacherId: string) {
 		console.log('[LESSON CONTROLLER] GET /teacher/:teacherId/confirmed-students called with teacherId:', teacherId);

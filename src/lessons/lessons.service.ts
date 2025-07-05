@@ -1110,6 +1110,46 @@ export class LessonsService {
 		return enrichedLessons;
 	}
 
+	async getStudentSentRequestsPaged(studentId: string, page = 1, limit = 10) {
+		console.log(`📋 Получение отправленных заявок (paged) для студента ${studentId} (page=${page}, limit=${limit})`);
+
+		if (!this.validateUUID(studentId)) {
+			console.error(`❌ Invalid studentId UUID format: ${studentId}`);
+			throw new Error('Invalid student ID format');
+		}
+
+		const [lessons, total] = await this.lessonRepo.findAndCount({
+			where: { studentId },
+			order: { createdAt: 'DESC' },
+			skip: (page - 1) * limit,
+			take: limit,
+		});
+
+		const enrichedLessons = await Promise.all(
+			lessons.map(async (lesson) => {
+				const teacher = await this.authClient.getUserInfo(lesson.teacherId);
+				const teacherName = `${teacher?.name ?? ''} ${teacher?.surname ?? ''}`.trim();
+				return {
+					lessonId: lesson.id,
+					teacherId: lesson.teacherId,
+					teacherName,
+					scheduledAt: lesson.scheduledAt,
+					status: lesson.status,
+					createdAt: lesson.createdAt,
+					proposedTime: lesson.proposedTime,
+					studentConfirmed: lesson.studentConfirmed,
+					studentRefused: lesson.studentRefused,
+					proposedByTeacherAt: lesson.proposedByTeacherAt
+				};
+			})
+		);
+
+		return {
+			data: enrichedLessons,
+			total
+		};
+	}
+
 	// ==================== МЕТОДЫ ДЛЯ РАБОТЫ С ЗАМЕТКАМИ УРОКА ====================
 
 	// Сохранение/обновление заметок урока
