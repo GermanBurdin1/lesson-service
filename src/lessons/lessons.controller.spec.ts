@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { LessonsController } from './lessons.controller';
 import { LessonsService } from './lessons.service';
 
+// mock complet du service avec toutes les méthodes
 const mockLessonsService: Record<string, jest.Mock> = {
   bookLesson: jest.fn(),
   respondToBooking: jest.fn(),
@@ -46,6 +47,7 @@ describe('LessonsController', () => {
   let service: jest.Mocked<LessonsService>;
 
   beforeEach(async () => {
+    // TODO : peut-être qu'on devrait tester avec de vrais objets parfois
     const module: TestingModule = await Test.createTestingModule({
       controllers: [LessonsController],
       providers: [

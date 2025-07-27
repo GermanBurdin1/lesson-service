@@ -7,7 +7,7 @@ export class AuthClient {
   constructor(private readonly http: HttpService) {}
 
   async getUserInfo(userId: string): Promise<{ id: string; name: string; surname: string; photo_url?: string }> {
-    //console.log('📘 [auth] getUser requête pour l\' id:', userId);
+    //console.log('[auth] getUser requête pour l\' id:', userId);
     // const url = `http://auth-service:3001/auth/users/${userId}`; // docker
     const url = `${process.env.AUTH_SERVICE_URL}/auth/users/${userId}`;
     const { data } = await firstValueFrom(this.http.get(url));
@@ -17,6 +17,7 @@ export class AuthClient {
   async getTeacherFullProfile(userId: string): Promise<any> {
     const url = `${process.env.AUTH_SERVICE_URL}/teacher-profile/full/${userId}`;
     const { data } = await firstValueFrom(this.http.get(url));
+    // TODO : ajouter du cache pour éviter les appels répétés
     return data;
   }
 }

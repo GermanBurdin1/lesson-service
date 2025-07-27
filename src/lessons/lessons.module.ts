@@ -1,31 +1,32 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { HttpModule } from '@nestjs/axios';
+import { RabbitMQModule } from '@golevelup/nestjs-rabbitmq';
+import { LessonsController } from './lessons.controller';
+import { LessonsService } from './lessons.service';
 import { Lesson } from './lesson.entity';
 import { Task } from './task.entity';
 import { Question } from './question.entity';
 import { LessonNotes } from './lesson-notes.entity';
 import { HomeworkItem } from './homework-item.entity';
-import { LessonsService } from './lessons.service';
-import { LessonsController } from './lessons.controller';
-import { RabbitMQModule } from '@golevelup/nestjs-rabbitmq';
 import { AuthClient } from '../auth/auth.client';
-import { HttpModule } from '@nestjs/axios';
-import * as dotenv from 'dotenv';
-
-dotenv.config(); 
-
 
 @Module({
 	imports: [
 		TypeOrmModule.forFeature([Lesson, Task, Question, LessonNotes, HomeworkItem]),
 		HttpModule,
 		RabbitMQModule.forRoot(RabbitMQModule, {
-			// uri: 'amqp://guest:guest@rabbitmq:5672', // pour docker
-			uri: `amqp://${process.env.RABBITMQ_USER}:${process.env.RABBITMQ_PASSWORD}@${process.env.RABBITMQ_HOST}:${process.env.RABBITMQ_PORT}`, // pour localhost
-			exchanges: [{ name: 'lesson_exchange', type: 'direct' }],
+			exchanges: [
+				{
+					name: 'lesson_exchange',
+					type: 'topic',
+				},
+			],
+			uri: process.env.RABBITMQ_URL || 'amqp://localhost:5672',
 		}),
 	],
-	providers: [LessonsService, AuthClient],
 	controllers: [LessonsController],
+	providers: [LessonsService, AuthClient],
+	// TODO : peut-être exposer LessonsService pour d'autres modules
 })
-export class LessonsModule { }
+export class LessonsModule {}

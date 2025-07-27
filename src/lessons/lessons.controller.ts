@@ -12,7 +12,7 @@ export class LessonsController {
 
 	@Post('respond')
 	async respondToBooking(@Body() body: { lessonId: string, accepted: boolean, reason?: string, proposeAlternative?: boolean, proposedTime?: string }) {
-		console.log(`📥 [POST] /respond reçu:`, body);
+		console.log(`[LessonsController] POST /respond reçu:`, body);
 		return this.lessonsService.respondToBooking(
 			body.lessonId,
 			body.accepted,
@@ -36,23 +36,23 @@ export class LessonsController {
 		return this.lessonsService.getLessonsForUser(userId);
 	}
 
-	// ==================== СПЕЦИФИЧНЫЕ ENDPOINTS (должны быть ВЫШЕ общих) ====================
+	// ==================== ENDPOINTS SPÉCIFIQUES (doivent être AU-DESSUS des généraux) ====================
 
 	@Get('student/:id/confirmed-lessons')
 	async getConfirmedLessons(@Param('id') studentId: string) {
-		console.log(`📥 [GET] /student/${studentId}/confirmed-lessons reçu`);
+		console.log(`[LessonsController] GET /student/${studentId}/confirmed-lessons reçu`);
 		return this.lessonsService.getLessonsForStudent(studentId, 'confirmed');
 	}
 
 	@Get('student/:id/teachers')
 	async getTeachersForStudent(@Param('id') studentId: string) {
-		Logger.log(`[LessonsController] getTeachersForStudent вызван для studentId: ${studentId}`);
+		Logger.log(`[LessonsController] getTeachersForStudent appelé pour studentId: ${studentId}`);
 		return this.lessonsService.getTeachersForStudent(studentId);
 	}
 
 	@Get('student/:studentId/sent-requests')
 	async getStudentSentRequests(@Param('studentId') studentId: string) {
-		console.log(`📥 [GET] /student/:studentId/sent-requests получен для studentId: ${studentId}`);
+		console.log(`[LessonsController] GET /student/:studentId/sent-requests reçu pour studentId: ${studentId}`);
 		return this.lessonsService.getStudentSentRequests(studentId);
 	}
 
@@ -62,7 +62,7 @@ export class LessonsController {
 		@Query('page') page: number = 1,
 		@Query('limit') limit: number = 10
 	) {
-		console.log(`📥 [GET] /student/:studentId/sent-requests-paged получен для studentId: ${studentId}, page: ${page}, limit: ${limit}`);
+		console.log(`[LessonsController] GET /student/:studentId/sent-requests-paged reçu pour studentId: ${studentId}, page: ${page}, limit: ${limit}`);
 		return this.lessonsService.getStudentSentRequestsPaged(studentId, Number(page), Number(limit));
 	}
 
@@ -79,23 +79,23 @@ export class LessonsController {
 		return this.lessonsService.getAllConfirmedLessonsForTeacher(teacherId);
 	}
 
-	// ==================== ЭНДПОИНТ ДЛЯ ПОЛУЧЕНИЯ ДОСТУПНЫХ СЛОТОВ ====================
+	// ==================== ENDPOINT POUR RÉCUPÉRER LES CRÉNEAUX DISPONIBLES ====================
 
 	@Get('teacher/:teacherId/available-slots')
 	async getAvailableSlots(
 		@Param('teacherId') teacherId: string,
 		@Query('date') date?: string
 	) {
-		console.log(`📥 [GET] /teacher/${teacherId}/available-slots вызван для даты: ${date || 'сегодня'}`);
+		console.log(`[LessonsController] GET /teacher/${teacherId}/available-slots appelé pour date: ${date || 'aujourd\'hui'}`);
 		const targetDate = date ? new Date(date) : new Date();
 		return this.lessonsService.getAvailableSlots(teacherId, targetDate);
 	}
 
-	// ==================== НОВЫЕ ЭНДПОИНТЫ ДЛЯ РАБОТЫ С ЗАДАЧАМИ, ВОПРОСАМИ И НАЧАЛОМ УРОКА ====================
+	// ==================== NOUVEAUX ENDPOINTS POUR TÂCHES, QUESTIONS ET DÉBUT COURS ====================
 
 	@Post('start')
 	async startLesson(@Body() body: { lessonId: string, startedBy: string }) {
-		console.log(`📥 [POST] /start получен:`, body);
+		console.log(`[LessonsController] POST /start reçu:`, body);
 		return this.lessonsService.startLesson(body.lessonId, body.startedBy);
 	}
 
@@ -164,39 +164,39 @@ export class LessonsController {
 		return this.lessonsService.getQuestionsForLesson(lessonId);
 	}
 
-	// ==================== ЭНДПОИНТ ДЛЯ СТАТИСТИКИ (ДОЛЖЕН БЫТЬ ВЫШЕ :id) ====================
+	// ==================== ENDPOINT POUR STATISTIQUES (DOIT ÊTRE AU-DESSUS de :id) ====================
 
 	/**
-	 * Получить количество завершенных уроков для студента
+	 * Récupérer le nombre de cours terminés pour un étudiant
 	 */
 	@Get('completed/count/:studentId')
 	async getCompletedLessonsCount(@Param('studentId') studentId: string) {
-		console.log(`📥 [GET] /completed/count/${studentId} получен`);
+		console.log(`[LessonsController] GET /completed/count/${studentId} reçu`);
 		const count = await this.lessonsService.getCompletedLessonsCount(studentId);
 		return { count };
 	}
 
 	/**
-	 * Получить статистику уроков за заданный период для админа
+	 * Récupérer les statistiques de cours pour une période donnée (admin)
 	 */
 	@Get('stats')
 	async getLessonsStats(
 		@Query('startDate') startDate: string,
 		@Query('endDate') endDate: string
 	) {
-		console.log(`📥 [GET] /stats получен с датами: ${startDate} - ${endDate}`);
+		console.log(`[LessonsController] GET /stats reçu avec dates: ${startDate} - ${endDate}`);
 		const stats = await this.lessonsService.getLessonsStats(new Date(startDate), new Date(endDate));
 		return stats;
 	}
 
-	// ==================== ОБЩИЙ ENDPOINT (должен быть ПОСЛЕДНИМ) ====================
+	// ==================== ENDPOINT GÉNÉRAL (doit être DERNIER) ====================
 
 	@Get(':id')
 	async getLessonById(@Param('id') lessonId: string) {
 		return this.lessonsService.getLessonById(lessonId);
 	}
 
-	// ==================== ЭНДПОИНТЫ ДЛЯ ЗАМЕТОК УРОКА ====================
+	// ==================== ENDPOINTS POUR NOTES DE COURS ====================
 
 	@Post(':id/notes')
 	async saveLessonNotes(
@@ -209,7 +209,7 @@ export class LessonsController {
 			createdByRole: 'student' | 'teacher';
 		}
 	) {
-		console.log(`📥 [POST] /:id/notes получен:`, body);
+		console.log(`[LessonsController] POST /:id/notes reçu:`, body);
 		return this.lessonsService.saveLessonNotes(
 			lessonId,
 			body.tasksContent || null,
@@ -225,7 +225,7 @@ export class LessonsController {
 		return this.lessonsService.getLessonNotes(lessonId);
 	}
 
-	// ==================== ЭНДПОИНТЫ ДЛЯ ДОМАШНИХ ЗАДАНИЙ ====================
+	// ==================== ENDPOINTS POUR DEVOIRS ====================
 
 	@Post(':id/homework')
 	async addHomeworkItem(
@@ -240,7 +240,7 @@ export class LessonsController {
 			createdByRole: 'student' | 'teacher';
 		}
 	) {
-		console.log(`📥 [POST] /:id/homework получен:`, body);
+		console.log(`[LessonsController] POST /:id/homework reçu:`, body);
 		return this.lessonsService.addHomeworkItem(
 			lessonId,
 			body.title,

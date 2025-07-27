@@ -42,6 +42,7 @@ describe('LessonsService', () => {
   let notesRepo: jest.Mocked<Repository<LessonNotes>>;
 
   beforeEach(async () => {
+    // setup du module de test avec mocks
     module = await Test.createTestingModule({
       providers: [
         LessonsService,

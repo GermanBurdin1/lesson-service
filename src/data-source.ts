@@ -8,13 +8,13 @@ import { HomeworkItem } from './lessons/homework-item.entity';
 export const AppDataSource = new DataSource({
   type: 'postgres',
   host: 'localhost',
-  port: 5432, // Стандартный порт PostgreSQL
+  port: 5432, // port standard PostgreSQL
   username: 'postgres',
   password: 'postgre',
-  database: 'db_lessons', // База данных как видно в pgAdmin
+  database: 'db_lessons', // base de données comme visible dans pgAdmin
   synchronize: false,
   logging: true,
-  entities: [Lesson, Task, Question, LessonNotes, HomeworkItem], // Добавлены новые entities
+  entities: [Lesson, Task, Question, LessonNotes, HomeworkItem], // nouvelles entités ajoutées
   migrations: ['src/migrations/*.ts'],
   subscribers: [],
 });

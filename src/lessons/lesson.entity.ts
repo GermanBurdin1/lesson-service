@@ -45,7 +45,7 @@ export class Lesson {
   @Column({ type: 'text', nullable: true })
   cancellationReason: string | null;
 
-  // Новые поля для отслеживания начала занятия
+  // nouveaux champs pour tracker le début du cours
   @Column({ type: 'timestamp', nullable: true })
   startedAt: Date | null;
 
@@ -56,16 +56,16 @@ export class Lesson {
   videoCallStarted: boolean;
 
   @Column({ type: 'uuid', nullable: true })
-  startedBy: string | null; // кто запустил видеосвязь
+  startedBy: string | null; // qui a démarré l'appel vidéo
 
-  // Связи с задачами и вопросами
+  // relations avec tâches et questions
   @OneToMany(() => Task, task => task.lesson)
   tasks: Task[];
 
   @OneToMany(() => Question, question => question.lesson)
   questions: Question[];
 
-  // Связи с заметками и домашними заданиями
+  // relations avec notes et devoirs
   @OneToOne(() => LessonNotes, notes => notes.lesson)
   notes: LessonNotes;
 

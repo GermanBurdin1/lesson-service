@@ -30,7 +30,7 @@ export class LessonsService {
 		private readonly httpService: HttpService,
 	) { }
 
-	// Валидация UUID
+	// validation UUID
 	private validateUUID(id: string): boolean {
 		const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 		return uuidRegex.test(id);
@@ -41,11 +41,11 @@ export class LessonsService {
 	}
 
 	async bookLesson(studentId: string, teacherId: string, scheduledAt: Date) {
-		// ==================== ВАЛИДАЦИЯ ВРЕМЕНИ УРОКА ====================
-		console.log(`🔍 Проверка времени урока для преподавателя ${teacherId} и студента ${studentId} на время ${scheduledAt}`);
+		// ==================== VALIDATION TEMPS DU COURS ====================
+		console.log(`[LessonsService] Vérification du temps de cours pour prof ${teacherId} et étudiant ${studentId} à ${scheduledAt}`);
 
-		// Используем новую централизованную валидацию
-		// Проверка, что время не в прошлом
+		// on utilise la nouvelle validation centralisée
+		// vérification que l'heure n'est pas dans le passé
 		const now = new Date();
 		if (scheduledAt <= now) {
 			throw new Error('Impossible de réserver un créneau dans le passé');
@@ -53,7 +53,7 @@ export class LessonsService {
 
 		await this.validateLessonTime(teacherId, studentId, scheduledAt);
 
-		// Проверяем дублирование заявок от одного студента на одно время
+		// on vérifie les doublons de demandes d'un étudiant pour le même horaire
 		const existingStudentRequests = await this.lessonRepo.find({
 			where: [
 				{ studentId, scheduledAt, status: 'pending' },
@@ -62,13 +62,13 @@ export class LessonsService {
 		});
 
 		if (existingStudentRequests.length > 0) {
-			console.log(`❌ Студент ${studentId} уже имеет заявку/урок на это время`);
+			console.log(`[LessonsService] Étudiant ${studentId} a déjà une demande/cours à cette heure`);
 			throw new Error('Vous avez déjà une demande ou un cours programmé à cette heure.');
 		}
 
-		console.log(`✅ Проверка времени урока завершена успешно`);
+		console.log(`[LessonsService] Validation du temps du cours réussie`);
 
-		// ==================== СОЗДАНИЕ УРОКА ====================
+		// ==================== CRÉATION DU COURS ====================
 		const lesson = this.lessonRepo.create({
 			studentId,
 			teacherId,
@@ -78,7 +78,7 @@ export class LessonsService {
 
 		const savedLesson = await this.lessonRepo.save(lesson);
 
-		// Получаем имя и фамилию студента
+		// on récupère le nom et prénom de l'étudiant
 		const student = await this.authClient.getUserInfo(studentId);
 		const studentFullName = `${student.name ?? ''} ${student.surname ?? ''}`.trim();
 
@@ -99,9 +99,9 @@ export class LessonsService {
 			status: 'pending',
 		};
 
-		console.log('📤 [lesson-service] Публикуем событие lesson_created:', payload);
+		console.log('[lesson-service] Publication événement lesson_created:', payload);
 
-		// 🟢 Публикация через golevelup
+		// publication via golevelup
 		await this.amqp.publish('lesson_exchange', 'lesson_created', payload);
 
 		return savedLesson;
@@ -114,12 +114,12 @@ export class LessonsService {
 		proposeAlternative?: boolean,
 		proposedTime?: string
 	) {
-		console.log(`🔔 [START] Réponse à la demande de leçon (ID=${lessonId})`);
-		console.debug(`📨 Données: accepted=${accepted}, reason="${reason ?? 'N/A'}", proposeAlternative=${proposeAlternative}, proposedTime=${proposedTime}`);
+		console.log(`[LessonsService] Réponse à la demande de leçon (ID=${lessonId})`);
+		console.debug(`[LessonsService] Données: accepted=${accepted}, reason="${reason ?? 'N/A'}", proposeAlternative=${proposeAlternative}, proposedTime=${proposedTime}`);
 
 		const lesson = await this.lessonRepo.findOneBy({ id: lessonId });
 		if (!lesson) {
-			console.error(`❌ Leçon introuvable: ${lessonId}`);
+			console.error(`[LessonsService] Leçon introuvable: ${lessonId}`);
 			throw new Error('Leçon introuvable');
 		}
 
@@ -131,7 +131,7 @@ export class LessonsService {
 			lesson.studentRefused = null;
 			await this.lessonRepo.save(lesson);
 
-			// Получаем информацию о преподавателе для уведомления
+			// on récupère les infos du prof pour la notification
 			const teacher = await this.authClient.getUserInfo(lesson.teacherId);
 			const teacherName = `${teacher?.name ?? ''} ${teacher?.surname ?? ''}`.trim();
 
@@ -501,11 +501,11 @@ export class LessonsService {
 		lesson.cancellationReason = reason;
 		await this.lessonRepo.save(lesson);
 
-		// Получаем информацию о студенте
+		// on récupère les infos de l'étudiant
 		const student = await this.authClient.getUserInfo(lesson.studentId);
 		const studentName = `${student?.name ?? ''} ${student?.surname ?? ''}`.trim();
 
-		// Отправляем уведомление преподавателю
+		// on envoie une notification au prof
 		const refundText = isWithinTwoHours ? ' (pas de remboursement)' : ' (remboursement prévu)';
 		const payload = {
 			user_id: lesson.teacherId,
@@ -523,23 +523,23 @@ export class LessonsService {
 			status: 'unread',
 		};
 
-		console.debug('📦 Отправка уведомления преподавателю:', JSON.stringify(payload, null, 2));
+		console.debug('[LessonsService] Envoi notification au prof:', JSON.stringify(payload, null, 2));
 		await this.amqp.publish('lesson_exchange', 'lesson_cancelled', payload);
 
-		console.log(`✅ [END] Урок отменен со статусом: ${cancellationStatus}`);
+		console.log(`[LessonsService] Cours annulé avec statut: ${cancellationStatus}`);
 		return {
 			success: true,
 			status: cancellationStatus,
 			refundAvailable: !isWithinTwoHours,
 			message: isWithinTwoHours
-				? 'Урок отменен. Так как отмена произошла менее чем за 2 часа до начала, возврат средств не производится.'
-				: 'Урок отменен. Возврат средств будет произведен в течение 3-5 рабочих дней.'
+				? 'Cours annulé. Comme l\'annulation a eu lieu moins de 2h avant le début, aucun remboursement n\'est effectué.'
+				: 'Cours annulé. Le remboursement sera effectué dans 3-5 jours ouvrables.'
 		};
 	}
 
-	// ==================== ВАЛИДАЦИЯ ВРЕМЕНИ ЗАНЯТИЙ ====================
+	// ==================== VALIDATION TEMPS DES COURS ====================
 
-	// Получение полного расписания преподавателя с умными интервалами
+	// récupération du planning complet du prof avec intervalles intelligents
 	async getAvailableSlots(teacherId: string, date: Date): Promise<{
 		time: string;
 		available: boolean;
@@ -553,9 +553,9 @@ export class LessonsService {
 			duration: number; // в минутах
 		};
 	}[]> {
-		console.log(`🔍 Получение полного расписания преподавателя ${teacherId} на дату ${date.toDateString()}`);
+		console.log(`[LessonsService] Récupération planning complet prof ${teacherId} pour date ${date.toDateString()}`);
 
-		// Получаем все занятия преподавателя на указанную дату
+		// on récupère tous les cours du prof à la date indiquée
 		const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0);
 		const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59);
 
@@ -568,7 +568,7 @@ export class LessonsService {
 			order: { scheduledAt: 'ASC' }
 		});
 
-		// Получаем информацию о студентах для уроков
+		// on récupère les infos des étudiants pour les cours
 		const lessonsWithStudents = await Promise.all(
 			bookedLessons.map(async (lesson) => {
 				try {
@@ -578,7 +578,7 @@ export class LessonsService {
 						studentName: `${student?.name || ''} ${student?.surname || ''}`.trim() || 'Nom inconnu'
 					};
 				} catch (error) {
-					console.warn(`⚠️ Impossible de récupérer l'info étudiant ${lesson.studentId}:`, error);
+					console.warn(`[LessonsService] Impossible de récupérer l'info étudiant ${lesson.studentId}:`, error);
 					return {
 						...lesson,
 						studentName: 'Nom inconnu'
@@ -587,7 +587,7 @@ export class LessonsService {
 			})
 		);
 
-		// Создаем временную сетку каждые 30 минут с 8:00 до 22:00
+		// on crée une grille temporelle toutes les 30 min de 8h à 22h
 		const slots = [];
 		const baseDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 		const now = new Date();
@@ -596,7 +596,7 @@ export class LessonsService {
 			for (let minute = 0; minute < 60; minute += 30) {
 				const slotTime = new Date(baseDate.getTime() + hour * 60 * 60 * 1000 + minute * 60 * 1000);
 
-				// Пропускаем прошедшие слоты, если это сегодняшний день
+				// on ignore les créneaux passés si c'est aujourd'hui
 				if (slotTime <= now) {
 					continue;
 				}
@@ -798,7 +798,7 @@ export class LessonsService {
 			where: whereConditions
 		});
 
-		// Исключаем текущий урок если редактируем
+		// on exclut le cours actuel si on modifie
 		const filteredLessons = excludeLessonId
 			? existingLessons.filter(lesson => lesson.id !== excludeLessonId)
 			: existingLessons;
@@ -807,33 +807,33 @@ export class LessonsService {
 			const existingStart = new Date(existingLesson.scheduledAt);
 			const existingEnd = new Date(existingStart.getTime() + 60 * 60 * 1000);
 
-			// Проверяем прямое перекрытие
+			// on vérifie le chevauchement direct
 			const isOverlapping = (lessonStart < existingEnd && lessonEnd > existingStart);
 
 			if (isOverlapping) {
 				const conflictTime = existingStart.toLocaleString('fr-FR');
 				const participantName = existingLesson.teacherId === teacherId ? 'ce professeur' : 'cet étudiant';
-				throw new Error(`❌ Conflit d'horaire: ${participantName} a déjà un cours à ${conflictTime}`);
+				throw new Error(`Conflit d'horaire: ${participantName} a déjà un cours à ${conflictTime}`);
 			}
 
-			// Проверяем минимальный перерыв 15 минут
+			// on vérifie la pause minimum de 15 minutes
 			const timeDiffMinutes = Math.abs(lessonStart.getTime() - existingStart.getTime()) / (1000 * 60);
 
-			if (timeDiffMinutes < 75) { // 60 мин урок + 15 мин перерыв
+			if (timeDiffMinutes < 75) { // 60 min cours + 15 min pause
 				const conflictTime = existingStart.toLocaleString('fr-FR');
 				const participantName = existingLesson.teacherId === teacherId ? 'ce professeur' : 'cet étudiant';
-				throw new Error(`❌ Temps insuffisant: ${participantName} a un cours à ${conflictTime}. Minimum 15 minutes de pause requis entre les cours.`);
+				throw new Error(`Temps insuffisant: ${participantName} a un cours à ${conflictTime}. Minimum 15 minutes de pause requis entre les cours.`);
 			}
 		}
 
 		console.log('✅ Validation du temps du cours réussie');
 	}
 
-	// ==================== НОВЫЕ МЕТОДЫ ДЛЯ РАБОТЫ С ЗАДАЧАМИ, ВОПРОСАМИ И НАЧАЛОМ УРОКА ====================
+	// ==================== NOUVELLES MÉTHODES POUR TÂCHES, QUESTIONS ET DÉBUT COURS ====================
 
-	// Начало урока при запуске видео
+	// début du cours lors du lancement vidéo
 	async startLesson(lessonId: string, startedBy: string) {
-		console.log(`🎬 [START] Начинаем урок (ID=${lessonId}, startedBy=${startedBy})`);
+		console.log(`[LessonsService] Début du cours (ID=${lessonId}, startedBy=${startedBy})`);
 
 		const lesson = await this.lessonRepo.findOneBy({ id: lessonId });
 		if (!lesson) {
@@ -841,7 +841,7 @@ export class LessonsService {
 		}
 
 		if (lesson.status !== 'confirmed') {
-			throw new Error('Можно начать только подтвержденный урок (статус: confirmed)');
+			throw new Error('Seul un cours confirmé peut être démarré (statut: confirmed)');
 		}
 
 		// Обновляем статус урока
@@ -851,7 +851,7 @@ export class LessonsService {
 		lesson.startedBy = startedBy;
 		await this.lessonRepo.save(lesson);
 
-		// Уведомляем другого участника о начале урока
+		// on notifie l'autre participant du début du cours
 		const isStartedByTeacher = lesson.teacherId === startedBy;
 		const notificationTargetId = isStartedByTeacher ? lesson.studentId : lesson.teacherId;
 
@@ -876,13 +876,13 @@ export class LessonsService {
 
 		await this.amqp.publish('lesson_exchange', 'lesson_started', payload);
 
-		console.log(`✅ [END] Урок начат: ${lesson.id}`);
+		console.log(`[LessonsService] Cours démarré: ${lesson.id}`);
 		return { success: true, lesson };
 	}
 
-	// Завершение урока
+	// fin du cours
 	async endLesson(lessonId: string, endedBy: string) {
-		console.log(`🏁 [START] Завершаем урок (ID=${lessonId}, endedBy=${endedBy})`);
+		console.log(`[LessonsService] Fin du cours (ID=${lessonId}, endedBy=${endedBy})`);
 
 		const lesson = await this.lessonRepo.findOneBy({ id: lessonId });
 		if (!lesson) {
@@ -890,7 +890,7 @@ export class LessonsService {
 		}
 
 		if (lesson.status !== 'in_progress') {
-			throw new Error('Можно завершить только урок в процессе');
+			throw new Error('Seul un cours en cours peut être terminé');
 		}
 
 		// Обновляем статус урока

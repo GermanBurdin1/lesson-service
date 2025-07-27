@@ -4,7 +4,7 @@ export class AddTeacherProposalFields1750000000002 implements MigrationInterface
     name = 'AddTeacherProposalFields1750000000002';
 
     public async up(queryRunner: QueryRunner): Promise<void> {
-        // Добавляем поля для системы предложений времени от учителя
+        // ajout des champs pour le système de propositions d'horaire par le prof
         await queryRunner.query(`
             ALTER TABLE "lessons" 
             ADD COLUMN IF NOT EXISTS "proposedByTeacherAt" TIMESTAMP NULL,
@@ -14,11 +14,11 @@ export class AddTeacherProposalFields1750000000002 implements MigrationInterface
             ADD COLUMN IF NOT EXISTS "studentAlternativeTime" TIMESTAMP NULL
         `);
 
-        console.log('✅ Added teacher proposal fields to lessons table');
+        console.log('[Migration] Champs de proposition prof ajoutés à la table lessons');
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        // Удаляем добавленные поля
+        // suppression des champs ajoutés
         await queryRunner.query(`
             ALTER TABLE "lessons" 
             DROP COLUMN IF EXISTS "proposedByTeacherAt",
@@ -28,6 +28,6 @@ export class AddTeacherProposalFields1750000000002 implements MigrationInterface
             DROP COLUMN IF EXISTS "studentAlternativeTime"
         `);
 
-        console.log('✅ Removed teacher proposal fields from lessons table');
+        console.log('[Migration] Champs de proposition prof supprimés de la table lessons');
     }
 } 

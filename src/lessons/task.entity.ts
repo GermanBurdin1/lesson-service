@@ -27,6 +27,7 @@ export class Task {
   @Column({ type: 'timestamp', nullable: true })
   completedAt: Date | null;
 
+  // TODO : ajouter un champ priority pour ordonner les tâches
   @CreateDateColumn()
   createdAt: Date;
 
