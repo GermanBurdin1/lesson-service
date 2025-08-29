@@ -1,13 +1,20 @@
-import { Controller, Post, Body, Get, Query, Param, Logger, Put } from '@nestjs/common';
+import { Controller, Post, Body, Get, Query, Param, Logger, Put, UseGuards } from '@nestjs/common';
 import { LessonsService } from './lessons.service';
+import { SimpleAuthGuard } from '../auth/simple-auth.guard';
+import { BookLessonDto } from '../dto/book-lesson.dto';
 
 @Controller('lessons')
 export class LessonsController {
 	constructor(private readonly lessonsService: LessonsService) { }
 
+	@UseGuards(SimpleAuthGuard)
 	@Post('book')
-	bookLesson(@Body() body: { studentId: string; teacherId: string; scheduledAt: string }) {
-		return this.lessonsService.bookLesson(body.studentId, body.teacherId, new Date(body.scheduledAt));
+	bookLesson(@Body() bookLessonDto: BookLessonDto) {
+		return this.lessonsService.bookLesson(
+			bookLessonDto.studentId, 
+			bookLessonDto.teacherId, 
+			new Date(bookLessonDto.scheduledAt)
+		);
 	}
 
 	@Post('respond')
@@ -44,6 +51,7 @@ export class LessonsController {
 		return this.lessonsService.getLessonsForStudent(studentId, 'confirmed');
 	}
 
+	@UseGuards(SimpleAuthGuard)
 	@Get('student/:id/teachers')
 	async getTeachersForStudent(@Param('id') studentId: string) {
 		Logger.log(`[LessonsController] getTeachersForStudent вызван для studentId: ${studentId}`);

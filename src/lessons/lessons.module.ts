@@ -9,6 +9,7 @@ import { LessonsService } from './lessons.service';
 import { LessonsController } from './lessons.controller';
 import { RabbitMQModule } from '@golevelup/nestjs-rabbitmq';
 import { AuthClient } from '../auth/auth.client';
+import { SimpleAuthGuard } from '../auth/simple-auth.guard';
 import { HttpModule } from '@nestjs/axios';
 import * as dotenv from 'dotenv';
 
@@ -25,7 +26,7 @@ dotenv.config();
 			exchanges: [{ name: 'lesson_exchange', type: 'direct' }],
 		}),
 	],
-	providers: [LessonsService, AuthClient],
+	providers: [LessonsService, AuthClient, SimpleAuthGuard],
 	controllers: [LessonsController],
 })
 export class LessonsModule { }
