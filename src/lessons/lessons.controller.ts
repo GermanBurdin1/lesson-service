@@ -1,7 +1,9 @@
-import { Controller, Post, Body, Get, Query, Param, Logger, Put, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Get, Query, Param, Logger, Put, UseGuards, Delete } from '@nestjs/common';
 import { LessonsService } from './lessons.service';
 import { SimpleAuthGuard } from '../auth/simple-auth.guard';
 import { BookLessonDto } from '../dto/book-lesson.dto';
+import { CreateGroupClassDto } from '../dto/create-group-class.dto';
+import { AddStudentToClassDto } from '../dto/add-student-to-class.dto';
 
 @Controller('lessons')
 export class LessonsController {
@@ -315,5 +317,49 @@ export class LessonsController {
 	@Get(':id/full-details')
 	async getLessonWithFullDetails(@Param('id') lessonId: string) {
 		return this.lessonsService.getLessonWithFullDetails(lessonId);
+	}
+
+	// ==================== GROUP CLASSES ENDPOINTS ====================
+
+	@UseGuards(SimpleAuthGuard)
+	@Post('group-classes')
+	async createGroupClass(@Body() createGroupClassDto: CreateGroupClassDto) {
+		return this.lessonsService.createGroupClass(createGroupClassDto);
+	}
+
+	@UseGuards(SimpleAuthGuard)
+	@Get('group-classes/teacher/:teacherId')
+	async getTeacherGroupClasses(@Param('teacherId') teacherId: string) {
+		return this.lessonsService.getTeacherGroupClasses(teacherId);
+	}
+
+	@UseGuards(SimpleAuthGuard)
+	@Post('group-classes/students')
+	async addStudentToClass(@Body() addStudentDto: AddStudentToClassDto) {
+		return this.lessonsService.addStudentToClass(addStudentDto);
+	}
+
+	@UseGuards(SimpleAuthGuard)
+	@Delete('group-classes/:classId/students/:studentId')
+	async removeStudentFromClass(
+		@Param('classId') classId: string,
+		@Param('studentId') studentId: string
+	) {
+		return this.lessonsService.removeStudentFromClass(classId, studentId);
+	}
+
+	@UseGuards(SimpleAuthGuard)
+	@Put('group-classes/:id')
+	async updateGroupClass(
+		@Param('id') id: string,
+		@Body() updateData: Partial<CreateGroupClassDto>
+	) {
+		return this.lessonsService.updateGroupClass(id, updateData);
+	}
+
+	@UseGuards(SimpleAuthGuard)
+	@Delete('group-classes/:id')
+	async deleteGroupClass(@Param('id') id: string) {
+		return this.lessonsService.deleteGroupClass(id);
 	}
 }

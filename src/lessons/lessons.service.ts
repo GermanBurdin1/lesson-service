@@ -6,11 +6,15 @@ import { Task } from './task.entity';
 import { Question } from './question.entity';
 import { LessonNotes } from './lesson-notes.entity';
 import { HomeworkItem } from './homework-item.entity';
+import { GroupClass } from './group-class.entity';
+import { GroupClassStudent } from './group-class-student.entity';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { AuthClient } from '../auth/auth.client';
 import { HttpService } from '@nestjs/axios';
 import { lastValueFrom } from 'rxjs';
 import { In, Between, Like, ILike } from 'typeorm';
+import { CreateGroupClassDto } from '../dto/create-group-class.dto';
+import { AddStudentToClassDto } from '../dto/add-student-to-class.dto';
 
 @Injectable()
 export class LessonsService {
@@ -25,6 +29,10 @@ export class LessonsService {
 		private lessonNotesRepo: Repository<LessonNotes>,
 		@InjectRepository(HomeworkItem)
 		private homeworkRepo: Repository<HomeworkItem>,
+		@InjectRepository(GroupClass)
+		private groupClassRepo: Repository<GroupClass>,
+		@InjectRepository(GroupClassStudent)
+		private groupClassStudentRepo: Repository<GroupClassStudent>,
 		private readonly amqp: AmqpConnection,
 		private readonly authClient: AuthClient,
 		private readonly httpService: HttpService,
@@ -1650,6 +1658,125 @@ export class LessonsService {
 					successRate: 0
 				};
 			}
+		}
+	}
+
+	// ==================== GROUP CLASSES METHODS ====================
+
+	async createGroupClass(createGroupClassDto: CreateGroupClassDto): Promise<GroupClass> {
+		if (!this.validateUUID(createGroupClassDto.teacherId)) {
+			throw new Error('Invalid teacher ID format');
+		}
+
+		const groupClass = this.groupClassRepo.create({
+			name: createGroupClassDto.name,
+			level: createGroupClassDto.level,
+			description: createGroupClassDto.description,
+			maxStudents: createGroupClassDto.maxStudents || 10,
+			teacherId: createGroupClassDto.teacherId,
+			scheduledAt: new Date(createGroupClassDto.scheduledAt),
+		});
+
+		return await this.groupClassRepo.save(groupClass);
+	}
+
+	async getTeacherGroupClasses(teacherId: string): Promise<GroupClass[]> {
+		if (!this.validateUUID(teacherId)) {
+			throw new Error('Invalid teacher ID format');
+		}
+
+		return await this.groupClassRepo.find({
+			where: { teacherId },
+			relations: ['students'],
+			order: { createdAt: 'DESC' }
+		});
+	}
+
+	async addStudentToClass(addStudentDto: AddStudentToClassDto): Promise<GroupClassStudent> {
+		if (!this.validateUUIDs(addStudentDto.groupClassId, addStudentDto.studentId)) {
+			throw new Error('Invalid ID format');
+		}
+
+		// Проверяем, существует ли класс
+		const groupClass = await this.groupClassRepo.findOne({
+			where: { id: addStudentDto.groupClassId },
+			relations: ['students']
+		});
+
+		if (!groupClass) {
+			throw new Error('Group class not found');
+		}
+
+		// Проверяем, не превышен ли лимит студентов
+		if (groupClass.students.length >= groupClass.maxStudents) {
+			throw new Error('Class is full');
+		}
+
+		// Проверяем, нет ли уже такого студента в классе
+		const existingStudent = await this.groupClassStudentRepo.findOne({
+			where: {
+				groupClassId: addStudentDto.groupClassId,
+				studentId: addStudentDto.studentId,
+				status: 'active'
+			}
+		});
+
+		if (existingStudent) {
+			throw new Error('Student already in this class');
+		}
+
+		const groupClassStudent = this.groupClassStudentRepo.create({
+			groupClassId: addStudentDto.groupClassId,
+			studentId: addStudentDto.studentId,
+			studentName: addStudentDto.studentName,
+		});
+
+		return await this.groupClassStudentRepo.save(groupClassStudent);
+	}
+
+	async removeStudentFromClass(groupClassId: string, studentId: string): Promise<void> {
+		if (!this.validateUUIDs(groupClassId, studentId)) {
+			throw new Error('Invalid ID format');
+		}
+
+		const student = await this.groupClassStudentRepo.findOne({
+			where: {
+				groupClassId,
+				studentId,
+				status: 'active'
+			}
+		});
+
+		if (!student) {
+			throw new Error('Student not found in this class');
+		}
+
+		student.status = 'removed';
+		await this.groupClassStudentRepo.save(student);
+	}
+
+	async updateGroupClass(id: string, updateData: Partial<GroupClass>): Promise<GroupClass> {
+		if (!this.validateUUID(id)) {
+			throw new Error('Invalid class ID format');
+		}
+
+		const groupClass = await this.groupClassRepo.findOne({ where: { id } });
+		if (!groupClass) {
+			throw new Error('Group class not found');
+		}
+
+		Object.assign(groupClass, updateData);
+		return await this.groupClassRepo.save(groupClass);
+	}
+
+	async deleteGroupClass(id: string): Promise<void> {
+		if (!this.validateUUID(id)) {
+			throw new Error('Invalid class ID format');
+		}
+
+		const result = await this.groupClassRepo.delete(id);
+		if (result.affected === 0) {
+			throw new Error('Group class not found');
 		}
 	}
 }
