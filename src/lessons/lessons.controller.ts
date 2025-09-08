@@ -3,6 +3,7 @@ import { LessonsService } from './lessons.service';
 import { SimpleAuthGuard } from '../auth/simple-auth.guard';
 import { BookLessonDto } from '../dto/book-lesson.dto';
 import { CreateGroupClassDto } from '../dto/create-group-class.dto';
+import { UpdateGroupClassDto } from '../dto/update-group-class.dto';
 import { AddStudentToClassDto } from '../dto/add-student-to-class.dto';
 
 @Controller('lessons')
@@ -352,9 +353,15 @@ export class LessonsController {
 	@Put('group-classes/:id')
 	async updateGroupClass(
 		@Param('id') id: string,
-		@Body() updateData: Partial<CreateGroupClassDto>
+		@Body() updateData: UpdateGroupClassDto
 	) {
-		return this.lessonsService.updateGroupClass(id, updateData);
+		// Преобразуем scheduledAt из string в Date, если оно присутствует
+		const processedData: any = { ...updateData };
+		if (updateData.scheduledAt) {
+			processedData.scheduledAt = new Date(updateData.scheduledAt);
+		}
+		
+		return this.lessonsService.updateGroupClass(id, processedData);
 	}
 
 	@UseGuards(SimpleAuthGuard)
