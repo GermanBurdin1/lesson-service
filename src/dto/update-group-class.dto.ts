@@ -29,3 +29,4 @@ export class UpdateGroupClassDto {
   @IsDateString()
   scheduledAt?: string;
 }
+
