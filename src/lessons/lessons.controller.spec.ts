@@ -161,7 +161,7 @@ describe('LessonsController', () => {
 
   describe('addTaskToLesson', () => {
     it('should call service.addTaskToLesson', async () => {
-      const body = { lessonId: 'l1', title: 'Task', createdBy: 'u1', createdByRole: 'teacher' as 'teacher' };
+      const body = { lessonId: 'l1', title: 'Task', createdBy: 'u1', createdByRole: 'teacher' as const };
       await controller.addTaskToLesson(body);
       expect(service.addTaskToLesson).toHaveBeenCalledWith(body.lessonId, body.title, null, body.createdBy, body.createdByRole);
     });
@@ -213,7 +213,7 @@ describe('LessonsController', () => {
 
   describe('saveLessonNotes', () => {
     it('should call service.saveLessonNotes', async () => {
-      const body = { createdBy: 'u1', createdByRole: 'teacher' as 'teacher' };
+      const body = { createdBy: 'u1', createdByRole: 'teacher' as const };
       await controller.saveLessonNotes('l1', body);
       expect(service.saveLessonNotes).toHaveBeenCalled();
     });
@@ -230,10 +230,10 @@ describe('LessonsController', () => {
     it('should call service.addHomeworkItem', async () => {
       const body = {
         title: 'HW',
-        itemType: 'task' as 'task',
+        itemType: 'task' as const,
         dueDate: '2025-07-15',
         createdBy: 'u1',
-        createdByRole: 'teacher' as 'teacher',
+        createdByRole: 'teacher' as const,
         description: null,
         originalItemId: null,
       };

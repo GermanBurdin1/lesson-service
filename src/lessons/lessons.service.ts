@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Lesson } from './lesson.entity';
@@ -12,12 +12,14 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { AuthClient } from '../auth/auth.client';
 import { HttpService } from '@nestjs/axios';
 import { lastValueFrom } from 'rxjs';
-import { In, Between, Like, ILike } from 'typeorm';
+import { In, Between } from 'typeorm';
 import { CreateGroupClassDto } from '../dto/create-group-class.dto';
 import { AddStudentToClassDto } from '../dto/add-student-to-class.dto';
 
 @Injectable()
 export class LessonsService {
+	private readonly logger = new Logger(LessonsService.name);
+
 	constructor(
 		@InjectRepository(Lesson)
 		private lessonRepo: Repository<Lesson>,
@@ -714,7 +716,7 @@ export class LessonsService {
 				// Заканчиваем текущий интервал
 				if (currentInterval) {
 					const duration = (i - currentInterval.startIndex) * 30; // каждый слот 30 минут
-					const endTime = i > 0 ? result[i - 1].time : slot.time;
+					// const endTime = i > 0 ? result[i - 1].time : slot.time;
 
 					// Добавляем информацию об интервале ко всем слотам в этом интервале
 					for (let j = currentInterval.startIndex; j < i; j++) {
@@ -1034,6 +1036,7 @@ export class LessonsService {
 
 	// Отметка задачи как выполненной
 	async completeTask(taskId: string, completedBy: string) {
+		this.logger.log(`✅ Задача ${taskId} отмечена как выполненная пользователем: ${completedBy}`);
 		const task = await this.taskRepo.findOneBy({ id: taskId });
 		if (!task) {
 			throw new Error('Задача не найдена');
@@ -1048,6 +1051,7 @@ export class LessonsService {
 
 	// Ответ на вопрос
 	async answerQuestion(questionId: string, answer: string, answeredBy: string) {
+		this.logger.log(`❓ Вопрос ${questionId} отвечен пользователем: ${answeredBy}`);
 		const question = await this.questionRepo.findOneBy({ id: questionId });
 		if (!question) {
 			throw new Error('Вопрос не найден');
@@ -1422,6 +1426,7 @@ export class LessonsService {
 
 	// Отметка домашнего задания как выполненного
 	async completeHomework(homeworkId: string, completedBy: string) {
+		this.logger.log(`📝 Домашнее задание ${homeworkId} отмечено как выполненное пользователем: ${completedBy}`);
 		const homework = await this.homeworkRepo.findOneBy({ id: homeworkId });
 		if (!homework) {
 			throw new Error('Домашнее задание не найдено');
@@ -1549,6 +1554,7 @@ export class LessonsService {
 	}
 
 	async completeQuestion(questionId: string, completedBy: string) {
+		this.logger.log(`❓ Вопрос ${questionId} отмечен как завершенный пользователем: ${completedBy}`);
 		const question = await this.questionRepo.findOneBy({ id: questionId });
 		if (!question) {
 			throw new Error('Вопрос не найден');

@@ -6,6 +6,8 @@ import { Task } from './task.entity';
 import { Question } from './question.entity';
 import { LessonNotes } from './lesson-notes.entity';
 import { HomeworkItem } from './homework-item.entity';
+import { GroupClass } from './group-class.entity';
+import { GroupClassStudent } from './group-class-student.entity';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { AuthClient } from '../auth/auth.client';
 import { HttpService } from '@nestjs/axios';
@@ -104,6 +106,26 @@ describe('LessonsService', () => {
           useValue: {
             get: jest.fn(),
             patch: jest.fn(),
+          },
+        },
+        {
+          provide: getRepositoryToken(GroupClass),
+          useValue: {
+            findOne: jest.fn(),
+            find: jest.fn(),
+            save: jest.fn(),
+            create: jest.fn(),
+            findOneBy: jest.fn(),
+          },
+        },
+        {
+          provide: getRepositoryToken(GroupClassStudent),
+          useValue: {
+            findOne: jest.fn(),
+            find: jest.fn(),
+            save: jest.fn(),
+            create: jest.fn(),
+            findOneBy: jest.fn(),
           },
         },
       ],
