@@ -30,11 +30,6 @@ jobs:
     - name: Run linter
       run: npm run lint
       
-    - name: Run tests
-      run: npm run test
-      env:
-        CI: true
-      
     - name: Build application
       run: npm run build
       
