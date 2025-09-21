@@ -407,7 +407,10 @@ export class LessonsService {
 	async getConfirmedStudentsForTeacher(teacherId: string): Promise<any[]> {
 		console.log('[LESSON SERVICE] getConfirmedStudentsForTeacher called with teacherId:', teacherId);
 		const lessons = await this.lessonRepo.find({
-			where: { teacherId, status: 'confirmed' },
+			where: {
+				teacherId,
+				status: In(['confirmed', 'cancelled_by_student', 'cancelled_by_student_no_refund', 'in_progress', 'completed'])
+			},
 			order: { scheduledAt: 'ASC' }
 		});
 		const uniqueStudentIds = Array.from(new Set(lessons.map(l => l.studentId)));
