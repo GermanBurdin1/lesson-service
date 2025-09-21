@@ -7,7 +7,10 @@ if (!globalThis.crypto) {
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { HttpModule } from '@nestjs/axios';
 import { LessonsModule } from './lessons/lessons.module';
+import { WhiteboardController } from './whiteboard/whiteboard.controller';
+import { WhiteboardService } from './whiteboard/whiteboard.service';
 import { Lesson } from './lessons/lesson.entity';
 import { Task } from './lessons/task.entity';
 import { Question } from './lessons/question.entity';
@@ -19,6 +22,7 @@ import { GroupClassStudent } from './lessons/group-class-student.entity';
 @Module({
 	imports: [
 		ConfigModule.forRoot({ isGlobal: true }),
+		HttpModule,
 
 		TypeOrmModule.forRootAsync({
 			imports: [ConfigModule],
@@ -37,5 +41,7 @@ import { GroupClassStudent } from './lessons/group-class-student.entity';
 		}),
 		LessonsModule
 	],
+	controllers: [WhiteboardController],
+	providers: [WhiteboardService],
 })
 export class AppModule { }
