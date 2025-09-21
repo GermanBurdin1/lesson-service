@@ -43,7 +43,7 @@ export class WhiteboardController {
 			
 			// Извлекаем путь после agora-proxy
 			const pathAfterProxy = req.url.replace('/lessons/whiteboard/agora-proxy', '');
-			const agoraUrl = `https://api-us-sv.whiteboard.rtelink.com${pathAfterProxy}`;
+			const agoraUrl = `https://api-cn-hz.whiteboard.rtelink.com${pathAfterProxy}`;
 			console.log('🔄 Проксируем запрос к Agora:', agoraUrl);
 			
 			const response = await this.whiteboardService.proxyAgoraRequest(agoraUrl);

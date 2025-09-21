@@ -4,8 +4,8 @@ import { firstValueFrom } from 'rxjs';
 
 @Injectable()
 export class WhiteboardService {
-	private readonly API_URL_UUID = 'https://api.netless.link/v5/rooms';
-	private readonly API_URL_ROOM_TOKEN = 'https://api.netless.link/v5/tokens/rooms';
+	private readonly API_URL_UUID = 'https://api-cn-hz.netless.link/v5/rooms';
+	private readonly API_URL_ROOM_TOKEN = 'https://api-cn-hz.netless.link/v5/tokens/rooms';
 	
 	// Agora Whiteboard credentials
 	private readonly APP_IDENTIFIER = 'tmuA4P_vEe-XRGk9GboPXw/t7oX_QbCKG52Pw'; // App Identifier
