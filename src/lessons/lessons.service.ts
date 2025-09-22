@@ -1788,4 +1788,81 @@ export class LessonsService {
 			throw new Error('Group class not found');
 		}
 	}
+
+	/**
+	 * Добавить студента по email
+	 */
+	async addStudentByEmail(email: string, teacherId: string): Promise<{ success: boolean; message: string; studentId?: string }> {
+		this.devLog(`[LESSON SERVICE] addStudentByEmail called with email: ${email}, teacherId: ${teacherId}`);
+		
+		try {
+			// 1. Проверяем, существует ли пользователь с таким email в auth-service
+			const userInfo = await this.authClient.getUserByEmail(email);
+			this.devLog(`[LESSON SERVICE] User found in auth-service:`, userInfo);
+			
+			if (!userInfo) {
+				this.devLog(`[LESSON SERVICE] User not found for email: ${email}`);
+				return {
+					success: false,
+					message: 'Пользователь с таким email не найден'
+				};
+			}
+
+			// 2. Проверяем, подтвержден ли email
+			if (!userInfo.is_email_confirmed) {
+				this.devLog(`[LESSON SERVICE] Email not confirmed for user: ${userInfo.id}`);
+				return {
+					success: false,
+					message: 'Email пользователя не подтвержден'
+				};
+			}
+
+			// 3. Проверяем, не добавлен ли уже этот студент к преподавателю
+			const existingLesson = await this.lessonRepo.findOne({
+				where: {
+					teacherId: teacherId,
+					studentId: userInfo.id
+				}
+			});
+
+			if (existingLesson) {
+				this.devLog(`[LESSON SERVICE] Student already exists for teacher: ${teacherId}, student: ${userInfo.id}`);
+				return {
+					success: false,
+					message: 'Студент уже добавлен к этому преподавателю'
+				};
+			}
+
+			// 4. Создаем запись в таблице lessons
+			const newLesson = this.lessonRepo.create({
+				teacherId: teacherId,
+				studentId: userInfo.id,
+				status: 'pending',
+				scheduledAt: new Date(), // Обязательное поле в entity
+				videoCallStarted: false
+			});
+
+			await this.lessonRepo.save(newLesson);
+			this.devLog(`[LESSON SERVICE] Student added successfully:`, newLesson);
+
+			return {
+				success: true,
+				message: `Студент ${userInfo.name || userInfo.email} успешно добавлен`,
+				studentId: userInfo.id
+			};
+
+		} catch (error) {
+			this.devLog(`[LESSON SERVICE] Error adding student by email:`, error);
+			return {
+				success: false,
+				message: `Ошибка при добавлении студента: ${error.message}`
+			};
+		}
+	}
+
+	private devLog(message: string, ...args: any[]): void {
+		if (process.env.NODE_ENV !== 'production') {
+			console.log(message, ...args);
+		}
+	}
 }

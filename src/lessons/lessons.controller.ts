@@ -369,4 +369,11 @@ export class LessonsController {
 	async deleteGroupClass(@Param('id') id: string) {
 		return this.lessonsService.deleteGroupClass(id);
 	}
+
+	@UseGuards(SimpleAuthGuard)
+	@Post('add-student-by-email')
+	async addStudentByEmail(@Body() body: { email: string; teacherId: string }) {
+		console.log(`📧 [POST] /add-student-by-email reçu:`, body);
+		return this.lessonsService.addStudentByEmail(body.email, body.teacherId);
+	}
 }

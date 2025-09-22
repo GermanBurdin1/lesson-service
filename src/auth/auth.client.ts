@@ -19,4 +19,23 @@ export class AuthClient {
     const { data } = await firstValueFrom(this.http.get(url));
     return data;
   }
+
+  async getUserByEmail(email: string): Promise<{ id: string; name?: string; email: string; is_email_confirmed: boolean } | null> {
+    try {
+      this.devLog(`[AUTH CLIENT] Looking for user with email: ${email}`);
+      const url = `${process.env.AUTH_SERVICE_URL}/auth/users/by-email`;
+      const { data } = await firstValueFrom(this.http.post(url, { email }));
+      this.devLog(`[AUTH CLIENT] User found:`, data);
+      return data;
+    } catch (error) {
+      this.devLog(`[AUTH CLIENT] User not found or error:`, error.message);
+      return null;
+    }
+  }
+
+  private devLog(message: string, ...args: any[]): void {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(message, ...args);
+    }
+  }
 }
