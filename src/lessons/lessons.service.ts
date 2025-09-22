@@ -413,12 +413,17 @@ export class LessonsService {
 			},
 			order: { scheduledAt: 'ASC' }
 		});
+		this.devLog('[LESSON SERVICE] Found lessons:', lessons.length, lessons.map(l => ({ id: l.id, studentId: l.studentId, status: l.status, scheduledAt: l.scheduledAt })));
+		
 		const uniqueStudentIds = Array.from(new Set(lessons.map(l => l.studentId)));
+		this.devLog('[LESSON SERVICE] Unique student IDs:', uniqueStudentIds);
+		
 		const students = await Promise.all(
 			uniqueStudentIds.map(async (studentId) => {
 				const student = await this.authClient.getUserInfo(studentId);
 				const studentLessons = lessons.filter(l => l.studentId === studentId);
 				const nextLesson = studentLessons.length > 0 ? studentLessons[0] : null;
+				this.devLog(`[LESSON SERVICE] Student ${studentId}:`, { name: student.name, lessonsCount: studentLessons.length, nextLesson: nextLesson?.scheduledAt });
 				return {
 					id: studentId,
 					name: `${student.name ?? ''} ${student.surname ?? ''}`.trim(),
@@ -1790,9 +1795,57 @@ export class LessonsService {
 	}
 
 	/**
+	 * Получить студента по email
+	 */
+	async getStudentByEmail(email: string): Promise<{ success: boolean; message: string; student?: any }> {
+		this.devLog(`[LESSON SERVICE] getStudentByEmail called with email: ${email}`);
+		
+		try {
+			// Получаем информацию о пользователе из auth-service
+			const userInfo = await this.authClient.getUserByEmail(email);
+			this.devLog(`[LESSON SERVICE] User found in auth-service:`, userInfo);
+			
+			if (!userInfo) {
+				this.devLog(`[LESSON SERVICE] User not found for email: ${email}`);
+				return {
+					success: false,
+					message: 'Пользователь с таким email не найден'
+				};
+			}
+
+			// Проверяем, подтвержден ли email
+			if (!userInfo.is_email_confirmed) {
+				this.devLog(`[LESSON SERVICE] Email not confirmed for user: ${userInfo.id}`);
+				return {
+					success: false,
+					message: 'Email пользователя не подтвержден'
+				};
+			}
+
+			return {
+				success: true,
+				message: 'Студент найден',
+				student: {
+					id: userInfo.id,
+					name: userInfo.name,
+					email: userInfo.email,
+					is_email_confirmed: userInfo.is_email_confirmed
+				}
+			};
+
+		} catch (error) {
+			this.devLog(`[LESSON SERVICE] Error in getStudentByEmail:`, error);
+			return {
+				success: false,
+				message: 'Ошибка при поиске студента'
+			};
+		}
+	}
+
+	/**
 	 * Добавить студента по email
 	 */
-	async addStudentByEmail(email: string, teacherId: string): Promise<{ success: boolean; message: string; studentId?: string }> {
+	async addStudentByEmail(email: string, teacherId: string): Promise<{ success: boolean; message: string; studentId?: string; student?: any }> {
 		this.devLog(`[LESSON SERVICE] addStudentByEmail called with email: ${email}, teacherId: ${teacherId}`);
 		
 		try {
@@ -1827,6 +1880,7 @@ export class LessonsService {
 
 			if (existingLesson) {
 				this.devLog(`[LESSON SERVICE] Student already exists for teacher: ${teacherId}, student: ${userInfo.id}`);
+				this.devLog(`[LESSON SERVICE] Existing lesson:`, existingLesson);
 				return {
 					success: false,
 					message: 'Студент уже добавлен к этому преподавателю'
@@ -1837,18 +1891,34 @@ export class LessonsService {
 			const newLesson = this.lessonRepo.create({
 				teacherId: teacherId,
 				studentId: userInfo.id,
-				status: 'pending',
+				status: 'confirmed', // Сразу подтверждаем, чтобы студент появился в списке
 				scheduledAt: new Date(), // Обязательное поле в entity
 				videoCallStarted: false
 			});
 
-			await this.lessonRepo.save(newLesson);
-			this.devLog(`[LESSON SERVICE] Student added successfully:`, newLesson);
+			this.devLog(`[LESSON SERVICE] Creating new lesson:`, newLesson);
+			const savedLesson = await this.lessonRepo.save(newLesson);
+			this.devLog(`[LESSON SERVICE] Student added successfully to database:`, savedLesson);
+
+			// 5. Проверяем, что студент теперь есть в базе данных
+			const verifyLesson = await this.lessonRepo.findOne({
+				where: {
+					teacherId: teacherId,
+					studentId: userInfo.id
+				}
+			});
+			this.devLog(`[LESSON SERVICE] Verification - lesson found in database:`, verifyLesson);
 
 			return {
 				success: true,
 				message: `Студент ${userInfo.name || userInfo.email} успешно добавлен`,
-				studentId: userInfo.id
+				studentId: userInfo.id,
+				student: {
+					id: userInfo.id,
+					name: userInfo.name,
+					email: userInfo.email,
+					is_email_confirmed: userInfo.is_email_confirmed
+				}
 			};
 
 		} catch (error) {
@@ -1858,6 +1928,136 @@ export class LessonsService {
 				message: `Ошибка при добавлении студента: ${error.message}`
 			};
 		}
+	}
+
+	/**
+	 * Создать приглашение в класс (добавить студента со статусом 'invited')
+	 */
+	async createClassInvitation(classId: string, teacherId: string, studentId: string, message?: string): Promise<GroupClassStudent> {
+		this.devLog(`[LESSON SERVICE] Creating class invitation: classId=${classId}, teacherId=${teacherId}, studentId=${studentId}`);
+		
+		// Проверяем, нет ли уже записи для этого студента в этом классе
+		const existingRecord = await this.groupClassStudentRepo.findOne({
+			where: {
+				groupClassId: classId,
+				studentId: studentId
+			}
+		});
+
+		if (existingRecord) {
+			this.devLog(`[LESSON SERVICE] Found existing record for student ${studentId} in class ${classId}, updating invitation`);
+			
+			// Если запись уже существует, обновляем её статус на 'invited'
+			await this.groupClassStudentRepo.update(existingRecord.id, {
+				status: 'invited',
+				invitedAt: new Date(),
+				invitationMessage: message,
+				isRead: false
+			});
+			
+			const updatedRecord = await this.groupClassStudentRepo.findOne({
+				where: { id: existingRecord.id }
+			});
+			
+			this.devLog(`[LESSON SERVICE] Updated existing invitation:`, updatedRecord);
+			return updatedRecord;
+		}
+
+		// Создаем новую запись со статусом 'invited'
+		const invitation = this.groupClassStudentRepo.create({
+			groupClassId: classId,
+			studentId: studentId,
+			status: 'invited',
+			invitedAt: new Date(),
+			invitationMessage: message,
+			isRead: false
+		});
+
+		const savedInvitation = await this.groupClassStudentRepo.save(invitation);
+		this.devLog(`[LESSON SERVICE] Class invitation created:`, savedInvitation);
+		
+		return savedInvitation;
+	}
+
+	/**
+	 * Получить непрочитанные приглашения для студента
+	 */
+	async getUnreadInvitationsForStudent(studentId: string): Promise<GroupClassStudent[]> {
+		this.devLog(`[LESSON SERVICE] Getting unread invitations for student: ${studentId}`);
+		
+		const invitations = await this.groupClassStudentRepo.find({
+			where: {
+				studentId,
+				status: 'invited',
+				isRead: false
+			},
+			relations: ['groupClass'],
+			order: {
+				invitedAt: 'DESC'
+			}
+		});
+
+		this.devLog(`[LESSON SERVICE] Found ${invitations.length} unread invitations for student ${studentId}`);
+		return invitations;
+	}
+
+	/**
+	 * Отметить приглашение как прочитанное
+	 */
+	async markInvitationAsRead(recordId: string): Promise<void> {
+		this.devLog(`[LESSON SERVICE] Marking invitation as read: ${recordId}`);
+		
+		await this.groupClassStudentRepo.update(recordId, {
+			isRead: true
+		});
+	}
+
+	/**
+	 * Принять приглашение в класс
+	 */
+	async acceptClassInvitation(recordId: string): Promise<GroupClassStudent> {
+		this.devLog(`[LESSON SERVICE] Accepting class invitation: ${recordId}`);
+		
+		const record = await this.groupClassStudentRepo.findOne({
+			where: { id: recordId }
+		});
+
+		if (!record) {
+			throw new Error('Приглашение не найдено');
+		}
+
+		// Обновляем статус на 'accepted'
+		await this.groupClassStudentRepo.update(recordId, {
+			status: 'accepted',
+			isRead: true,
+			respondedAt: new Date()
+		});
+
+		this.devLog(`[LESSON SERVICE] Student ${record.studentId} accepted invitation to class ${record.groupClassId}`);
+
+		// Возвращаем обновленную запись
+		return await this.groupClassStudentRepo.findOne({
+			where: { id: recordId },
+			relations: ['groupClass']
+		});
+	}
+
+	/**
+	 * Отклонить приглашение в класс
+	 */
+	async declineClassInvitation(recordId: string): Promise<GroupClassStudent> {
+		this.devLog(`[LESSON SERVICE] Declining class invitation: ${recordId}`);
+		
+		await this.groupClassStudentRepo.update(recordId, {
+			status: 'declined',
+			isRead: true,
+			respondedAt: new Date()
+		});
+
+		return await this.groupClassStudentRepo.findOne({
+			where: { id: recordId },
+			relations: ['groupClass']
+		});
 	}
 
 	private devLog(message: string, ...args: any[]): void {

@@ -15,8 +15,21 @@ export class GroupClassStudent {
   @CreateDateColumn()
   addedAt: Date;
 
-  @Column({ type: 'enum', enum: ['active', 'removed', 'completed'], default: 'active' })
-  status: 'active' | 'removed' | 'completed';
+  @Column({ type: 'enum', enum: ['active', 'removed', 'completed', 'invited', 'accepted', 'declined'], default: 'invited' })
+  status: 'active' | 'removed' | 'completed' | 'invited' | 'accepted' | 'declined';
+
+  // Поля для приглашений
+  @Column({ type: 'timestamp', nullable: true })
+  invitedAt: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
+  respondedAt: Date;
+
+  @Column({ type: 'text', nullable: true })
+  invitationMessage: string;
+
+  @Column({ default: false })
+  isRead: boolean;
 
   // Связь с групповым классом
   @ManyToOne(() => GroupClass, groupClass => groupClass.students, { onDelete: 'CASCADE' })

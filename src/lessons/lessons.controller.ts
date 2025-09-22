@@ -376,4 +376,40 @@ export class LessonsController {
 		console.log(`📧 [POST] /add-student-by-email reçu:`, body);
 		return this.lessonsService.addStudentByEmail(body.email, body.teacherId);
 	}
+
+	@Get('student/by-email/:email')
+	async getStudentByEmail(@Param('email') email: string) {
+		console.log(`📧 [GET] /student/by-email/${email} reçu`);
+		return this.lessonsService.getStudentByEmail(email);
+	}
+
+	@Get('invitations/student/:studentId')
+	async getUnreadInvitationsForStudent(@Param('studentId') studentId: string) {
+		console.log(`📨 [GET] /invitations/student/${studentId} reçu`);
+		return this.lessonsService.getUnreadInvitationsForStudent(studentId);
+	}
+
+	@Post('invitations/:recordId/accept')
+	async acceptClassInvitation(@Param('recordId') recordId: string) {
+		console.log(`✅ [POST] /invitations/${recordId}/accept reçu`);
+		return this.lessonsService.acceptClassInvitation(recordId);
+	}
+
+	@Post('invitations/:recordId/decline')
+	async declineClassInvitation(@Param('recordId') recordId: string) {
+		console.log(`❌ [POST] /invitations/${recordId}/decline reçu`);
+		return this.lessonsService.declineClassInvitation(recordId);
+	}
+
+	@Post('invitations/:recordId/read')
+	async markInvitationAsRead(@Param('recordId') recordId: string) {
+		console.log(`👁️ [POST] /invitations/${recordId}/read reçu`);
+		return this.lessonsService.markInvitationAsRead(recordId);
+	}
+
+	@Post('create-class-invitation')
+	async createClassInvitation(@Body() body: { classId: string; teacherId: string; studentId: string; message?: string }) {
+		console.log(`📨 [POST] /create-class-invitation reçu:`, body);
+		return this.lessonsService.createClassInvitation(body.classId, body.teacherId, body.studentId, body.message);
+	}
 }
