@@ -12,6 +12,9 @@ export class GroupClassStudent {
   @Column({ type: 'varchar', length: 255, nullable: true })
   studentName: string | null;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  studentEmail: string | null;
+
   @CreateDateColumn()
   addedAt: Date;
 
@@ -30,6 +33,9 @@ export class GroupClassStudent {
 
   @Column({ default: false })
   isRead: boolean;
+
+  @Column({ type: 'varchar', nullable: true })
+  invitationResponse: 'confirmed' | 'rejected' | null;
 
   // Связь с групповым классом
   @ManyToOne(() => GroupClass, groupClass => groupClass.students, { onDelete: 'CASCADE' })

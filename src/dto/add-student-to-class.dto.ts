@@ -11,4 +11,9 @@ export class AddStudentToClassDto {
   @IsString()
   @MaxLength(255)
   studentName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  studentEmail?: string;
 }

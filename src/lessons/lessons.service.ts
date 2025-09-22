@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, MoreThan } from 'typeorm';
 import { Lesson } from './lesson.entity';
 import { Task } from './task.entity';
 import { Question } from './question.entity';
@@ -1707,19 +1707,25 @@ export class LessonsService {
 	}
 
 	async addStudentToClass(addStudentDto: AddStudentToClassDto): Promise<GroupClassStudent> {
+		console.log('🔥🔥🔥 [SERVICE] addStudentToClass вызван с данными:', addStudentDto);
+		
 		if (!this.validateUUIDs(addStudentDto.groupClassId, addStudentDto.studentId)) {
+			console.log('❌ [SERVICE] Неверный формат ID');
 			throw new Error('Invalid ID format');
 		}
 
 		// Проверяем, существует ли класс
+		console.log('🔍 [SERVICE] Ищем класс с ID:', addStudentDto.groupClassId);
 		const groupClass = await this.groupClassRepo.findOne({
 			where: { id: addStudentDto.groupClassId },
 			relations: ['students']
 		});
 
 		if (!groupClass) {
+			console.log('❌ [SERVICE] Класс не найден!');
 			throw new Error('Group class not found');
 		}
+		console.log('✅ [SERVICE] Класс найден:', groupClass.name);
 
 		// Проверяем, не превышен ли лимит студентов
 		if (groupClass.students.length >= groupClass.maxStudents) {
@@ -1739,34 +1745,49 @@ export class LessonsService {
 			throw new Error('Student already in this class');
 		}
 
+		console.log('📝 [SERVICE] Создаем запись студента в базе данных');
 		const groupClassStudent = this.groupClassStudentRepo.create({
 			groupClassId: addStudentDto.groupClassId,
 			studentId: addStudentDto.studentId,
 			studentName: addStudentDto.studentName,
+			studentEmail: addStudentDto.studentEmail || null,
+			status: 'active' // Явно устанавливаем статус 'active'
 		});
 
-		return await this.groupClassStudentRepo.save(groupClassStudent);
+		console.log('💾 [SERVICE] Сохраняем студента в базе данных:', groupClassStudent);
+		const savedStudent = await this.groupClassStudentRepo.save(groupClassStudent);
+		console.log('✅ [SERVICE] Студент успешно сохранен:', savedStudent);
+		return savedStudent;
 	}
 
 	async removeStudentFromClass(groupClassId: string, studentId: string): Promise<void> {
+		this.devLog(`[LESSON SERVICE] removeStudentFromClass called with classId: ${groupClassId}, studentId: ${studentId}`);
+		
 		if (!this.validateUUIDs(groupClassId, studentId)) {
+			this.devLog(`[LESSON SERVICE] Invalid UUID format`);
 			throw new Error('Invalid ID format');
 		}
 
+		// Ищем студента в классе с любым статусом (не только 'active')
 		const student = await this.groupClassStudentRepo.findOne({
 			where: {
 				groupClassId,
-				studentId,
-				status: 'active'
+				studentId
 			}
 		});
 
+		this.devLog(`[LESSON SERVICE] Found student:`, student);
+
 		if (!student) {
-			throw new Error('Student not found in this class');
+			this.devLog(`[LESSON SERVICE] Student not found in database, but this is OK for local-only students`);
+			// Не выбрасываем ошибку, если студент не найден в базе данных
+			// Это может быть студент, который был добавлен только локально
+			return;
 		}
 
-		student.status = 'removed';
-		await this.groupClassStudentRepo.save(student);
+		// Удаляем запись из базы данных вместо изменения статуса
+		await this.groupClassStudentRepo.remove(student);
+		this.devLog(`[LESSON SERVICE] Student removed from class successfully`);
 	}
 
 	async updateGroupClass(id: string, updateData: Partial<GroupClass>): Promise<GroupClass> {
@@ -1982,14 +2003,20 @@ export class LessonsService {
 	/**
 	 * Получить непрочитанные приглашения для студента
 	 */
-	async getUnreadInvitationsForStudent(studentId: string): Promise<GroupClassStudent[]> {
+	async getUnreadInvitationsForStudent(studentId: string): Promise<any[]> {
 		this.devLog(`[LESSON SERVICE] Getting unread invitations for student: ${studentId}`);
+		
+		// Ищем приглашения со статусом 'invited' и invitationResponse = null (не отвеченные)
+		// Также проверяем, что класс еще не закончился (захардкожено 60 минут)
+		const now = new Date();
+		const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
 		
 		const invitations = await this.groupClassStudentRepo.find({
 			where: {
 				studentId,
 				status: 'invited',
-				isRead: false
+				invitationResponse: null,
+				invitedAt: MoreThan(oneHourAgo) // Только приглашения за последний час
 			},
 			relations: ['groupClass'],
 			order: {
@@ -1998,7 +2025,32 @@ export class LessonsService {
 		});
 
 		this.devLog(`[LESSON SERVICE] Found ${invitations.length} unread invitations for student ${studentId}`);
-		return invitations;
+		
+		// Логируем каждое найденное приглашение
+		invitations.forEach((invitation, index) => {
+			this.devLog(`[LESSON SERVICE] Invitation ${index + 1}: id=${invitation.id}, status=${invitation.status}, isRead=${invitation.isRead}`);
+		});
+
+		// Получаем имена преподавателей для каждого приглашения
+		const invitationsWithTeacherNames = await Promise.all(invitations.map(async (invitation) => {
+			try {
+				const teacherInfo = await this.authClient.getUserInfo(invitation.groupClass.teacherId);
+				this.devLog(`[LESSON SERVICE] Teacher info for ID ${invitation.groupClass.teacherId}:`, teacherInfo);
+				
+				return {
+					...invitation,
+					teacherName: teacherInfo?.name || teacherInfo?.surname || 'Professeur'
+				};
+			} catch (error) {
+				this.devLog(`[LESSON SERVICE] Error fetching teacher info for ID ${invitation.groupClass.teacherId}:`, error);
+				return {
+					...invitation,
+					teacherName: 'Professeur'
+				};
+			}
+		}));
+
+		return invitationsWithTeacherNames;
 	}
 
 	/**
@@ -2026,9 +2078,10 @@ export class LessonsService {
 			throw new Error('Приглашение не найдено');
 		}
 
-		// Обновляем статус на 'accepted'
+		// Обновляем статус на 'accepted' и устанавливаем invitationResponse = 'confirmed'
 		await this.groupClassStudentRepo.update(recordId, {
 			status: 'accepted',
+			invitationResponse: 'confirmed',
 			isRead: true,
 			respondedAt: new Date()
 		});
@@ -2043,15 +2096,44 @@ export class LessonsService {
 	}
 
 	/**
-	 * Отклонить приглашение в класс
+	 * Отклонить приглашение в класс (временно, не удаляем)
 	 */
 	async declineClassInvitation(recordId: string): Promise<GroupClassStudent> {
-		this.devLog(`[LESSON SERVICE] Declining class invitation: ${recordId}`);
+		this.devLog(`[LESSON SERVICE] Temporarily declining class invitation: ${recordId}`);
 		
+		// Сначала получаем текущую запись
+		const currentRecord = await this.groupClassStudentRepo.findOne({
+			where: { id: recordId }
+		});
+		
+		this.devLog(`[LESSON SERVICE] Current record status: ${currentRecord?.status}`);
+		
+		// Устанавливаем invitationResponse = 'rejected' и отмечаем как прочитанное
 		await this.groupClassStudentRepo.update(recordId, {
-			status: 'declined',
+			invitationResponse: 'rejected',
 			isRead: true,
 			respondedAt: new Date()
+		});
+
+		const updatedRecord = await this.groupClassStudentRepo.findOne({
+			where: { id: recordId },
+			relations: ['groupClass']
+		});
+		
+		this.devLog(`[LESSON SERVICE] Updated record status: ${updatedRecord?.status}`);
+		
+		return updatedRecord;
+	}
+
+	/**
+	 * Закрыть приглашение без ответа (только отметить как прочитанное)
+	 */
+	async closeInvitationWithoutResponse(recordId: string): Promise<GroupClassStudent> {
+		this.devLog(`[LESSON SERVICE] Closing invitation without response: ${recordId}`);
+		
+		// Только отмечаем как прочитанное, НЕ меняем invitationResponse
+		await this.groupClassStudentRepo.update(recordId, {
+			isRead: true
 		});
 
 		return await this.groupClassStudentRepo.findOne({

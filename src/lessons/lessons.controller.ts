@@ -337,6 +337,7 @@ export class LessonsController {
 	@UseGuards(SimpleAuthGuard)
 	@Post('group-classes/students')
 	async addStudentToClass(@Body() addStudentDto: AddStudentToClassDto) {
+		console.log('🔥🔥🔥 [CONTROLLER] addStudentToClass вызван с данными:', addStudentDto);
 		return this.lessonsService.addStudentToClass(addStudentDto);
 	}
 
@@ -405,6 +406,12 @@ export class LessonsController {
 	async markInvitationAsRead(@Param('recordId') recordId: string) {
 		console.log(`👁️ [POST] /invitations/${recordId}/read reçu`);
 		return this.lessonsService.markInvitationAsRead(recordId);
+	}
+
+	@Post('invitations/:recordId/close')
+	async closeInvitationWithoutResponse(@Param('recordId') recordId: string) {
+		console.log(`🔒 [POST] /invitations/${recordId}/close reçu`);
+		return this.lessonsService.closeInvitationWithoutResponse(recordId);
 	}
 
 	@Post('create-class-invitation')
