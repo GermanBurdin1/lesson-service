@@ -420,13 +420,21 @@ export class LessonsService {
 		
 		const students = await Promise.all(
 			uniqueStudentIds.map(async (studentId) => {
-				const student = await this.authClient.getUserInfo(studentId);
+				const student = await this.authClient.getUserInfoWithEmail(studentId);
 				const studentLessons = lessons.filter(l => l.studentId === studentId);
 				const nextLesson = studentLessons.length > 0 ? studentLessons[0] : null;
-				this.devLog(`[LESSON SERVICE] Student ${studentId}:`, { name: student.name, lessonsCount: studentLessons.length, nextLesson: nextLesson?.scheduledAt });
+				this.devLog(`[LESSON SERVICE] Student ${studentId}:`, { 
+					name: student.name, 
+					surname: student.surname,
+					email: student.email,
+					lessonsCount: studentLessons.length, 
+					nextLesson: nextLesson?.scheduledAt 
+				});
 				return {
 					id: studentId,
+					studentId: studentId,
 					name: `${student.name ?? ''} ${student.surname ?? ''}`.trim(),
+					email: student.email || 'email@example.com', // Используем реальный email из auth-service
 					photoUrl: student.photo_url || undefined,
 					isStudent: true,
 					nextLessonDate: nextLesson ? nextLesson.scheduledAt : null,

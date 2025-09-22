@@ -14,6 +14,13 @@ export class AuthClient {
     return data;
   }
 
+  async getUserInfoWithEmail(userId: string): Promise<{ id: string; name: string; surname: string; email: string; photo_url?: string }> {
+    //console.log('📘 [auth] getUserWithEmail requête pour l\' id:', userId);
+    const url = `${process.env.AUTH_SERVICE_URL}/auth/users/${userId}`;
+    const { data } = await firstValueFrom(this.http.get(url));
+    return data;
+  }
+
   async getTeacherFullProfile(userId: string): Promise<any> {
     const url = `${process.env.AUTH_SERVICE_URL}/teacher-profile/full/${userId}`;
     const { data } = await firstValueFrom(this.http.get(url));
