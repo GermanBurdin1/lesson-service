@@ -405,11 +405,11 @@ export class LessonsService {
 	}
 
 	async getConfirmedStudentsForTeacher(teacherId: string): Promise<any[]> {
-		console.log('[LESSON SERVICE] getConfirmedStudentsForTeacher called with teacherId:', teacherId);
+		this.devLog('[LESSON SERVICE] getConfirmedStudentsForTeacher called with teacherId:', teacherId);
 		const lessons = await this.lessonRepo.find({
 			where: {
 				teacherId,
-				status: In(['confirmed', 'cancelled_by_student', 'cancelled_by_student_no_refund', 'in_progress', 'completed'])
+				status: In(['pending', 'confirmed', 'cancelled_by_student', 'cancelled_by_student_no_refund', 'in_progress', 'completed'])
 			},
 			order: { scheduledAt: 'ASC' }
 		});
@@ -429,7 +429,7 @@ export class LessonsService {
 				};
 			})
 		);
-		console.log('[LESSON SERVICE] getConfirmedStudentsForTeacher result:', students);
+		this.devLog('[LESSON SERVICE] getConfirmedStudentsForTeacher result:', students);
 		return students;
 	}
 
