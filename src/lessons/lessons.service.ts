@@ -1714,6 +1714,29 @@ export class LessonsService {
 		});
 	}
 
+	async getStudentGroupClasses(studentId: string): Promise<GroupClass[]> {
+		this.devLog(`[LESSON SERVICE] Getting group classes for student: ${studentId}`);
+		
+		if (!this.validateUUID(studentId)) {
+			throw new Error('Invalid student ID format');
+		}
+		
+		// Находим все записи студента в group_class_students со статусом 'accepted'
+		const studentRecords = await this.groupClassStudentRepo.find({
+			where: { 
+				studentId,
+				status: 'accepted'
+			},
+			relations: ['groupClass']
+		});
+
+		// Извлекаем классы из записей
+		const classes = studentRecords.map(record => record.groupClass).filter(Boolean);
+		
+		this.devLog(`[LESSON SERVICE] Found ${classes.length} classes for student`);
+		return classes;
+	}
+
 	async addStudentToClass(addStudentDto: AddStudentToClassDto): Promise<GroupClassStudent> {
 		console.log('🔥🔥🔥 [SERVICE] addStudentToClass вызван с данными:', addStudentDto);
 		

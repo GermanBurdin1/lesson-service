@@ -335,6 +335,12 @@ export class LessonsController {
 	}
 
 	@UseGuards(SimpleAuthGuard)
+	@Get('group-classes/student/:studentId')
+	async getStudentGroupClasses(@Param('studentId') studentId: string) {
+		return this.lessonsService.getStudentGroupClasses(studentId);
+	}
+
+	@UseGuards(SimpleAuthGuard)
 	@Post('group-classes/students')
 	async addStudentToClass(@Body() addStudentDto: AddStudentToClassDto) {
 		console.log('🔥🔥🔥 [CONTROLLER] addStudentToClass вызван с данными:', addStudentDto);
