@@ -1,5 +1,6 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
+import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
 
 @Injectable()
@@ -7,12 +8,22 @@ export class WhiteboardService {
 	private readonly API_URL_UUID = 'https://api-cn-hz.netless.link/v5/rooms';
 	private readonly API_URL_ROOM_TOKEN = 'https://api-cn-hz.netless.link/v5/tokens/rooms';
 	
-	// Agora Whiteboard credentials
-	private readonly APP_IDENTIFIER = 'tmuA4P_vEe-XRGk9GboPXw/t7oX_QbCKG52Pw'; // App Identifier
-	private readonly SDK_TOKEN = 'NETLESSSDK_YWs9bWN3MTZsVFI3OHlFZzdmOCZub25jZT02Zjc5ZGEyMC05NzA2LTExZjAtODNiMC0zOTdkNzA0Mjc4ZDgmcm9sZT0wJnNpZz03NzA1ZTBiOTI0YjczNDI4NGI4MTZkZWIxN2Y4OTlmZjVhZTMxYzFmZDc1YjQxMzE2ZTIzZjZjZTgxMWMxMzc2'; // SDK Token из Agora Console
+	// Agora Whiteboard credentials - теперь из переменных окружения
+	private readonly APP_IDENTIFIER: string;
+	private readonly SDK_TOKEN: string;
 	private readonly REGION = 'cn-hz';
 
-	constructor(private readonly httpService: HttpService) {}
+	constructor(
+		private readonly httpService: HttpService,
+		private readonly configService: ConfigService
+	) {
+		this.APP_IDENTIFIER = this.configService.get<string>('AGORA_APP_IDENTIFIER');
+		this.SDK_TOKEN = this.configService.get<string>('AGORA_SDK_TOKEN');
+		
+		if (!this.APP_IDENTIFIER || !this.SDK_TOKEN) {
+			throw new Error('❌ Agora credentials not configured in environment variables');
+		}
+	}
 
 	/** Создаёт комнату и сразу получает Room Token */
 	async createRoom(): Promise<{ roomUuid: string; roomToken: string }> {
@@ -96,6 +107,11 @@ export class WhiteboardService {
 			console.error('❌ Сообщение:', error.message);
 			throw error;
 		}
+	}
+
+	/** Получает App Identifier (безопасно для фронтенда) */
+	getAppIdentifier(): string {
+		return this.APP_IDENTIFIER;
 	}
 
 }

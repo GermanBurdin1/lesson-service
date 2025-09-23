@@ -32,6 +32,18 @@ export class WhiteboardController {
 		return { roomToken: token };
 	}
 
+	/** Получает App Identifier для whiteboard */
+	@Get('app-identifier')
+	async getAppIdentifier() {
+		try {
+			const appIdentifier = this.whiteboardService.getAppIdentifier();
+			return { appIdentifier };
+		} catch (error) {
+			console.error('❌ Ошибка при получении App Identifier:', error);
+			throw new HttpException('Не удалось получить App Identifier', HttpStatus.INTERNAL_SERVER_ERROR);
+		}
+	}
+
 	/** Прокси для Agora API - получает конфигурацию регионов */
 	@Get('agora-proxy/*')
 	async agoraProxy(@Req() req: Request, @Res() res: Response) {
