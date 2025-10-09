@@ -88,6 +88,12 @@ describe('LessonsService', () => {
           provide: AuthClient,
           useValue: {
             getUserInfo: jest.fn().mockResolvedValue({ name: 'John', surname: 'Doe' }),
+            getUserInfoWithEmail: jest.fn().mockResolvedValue({ 
+              id: 's1', 
+              name: 'John', 
+              surname: 'Doe', 
+              email: 'john@example.com' 
+            }),
             getTeacherFullProfile: jest.fn().mockResolvedValue({
               user: { name: 'Teacher', surname: 'Smith', email: 't@t.com' },
               photo_url: '',

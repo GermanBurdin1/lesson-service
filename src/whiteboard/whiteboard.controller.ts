@@ -1,14 +1,17 @@
-import { Controller, Get, HttpException, HttpStatus, Post, Query, Req, Res } from '@nestjs/common';
+import { Controller, Get, HttpException, HttpStatus, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { WhiteboardService } from './whiteboard.service';
 import { Request, Response } from 'express';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('lessons/whiteboard')
 export class WhiteboardController {
 	constructor(private readonly whiteboardService: WhiteboardService) {}
 
 	/** Один запрос = создаёт комнату и сразу возвращает roomUuid + roomToken */
+	@UseGuards(JwtAuthGuard)
 	@Post('create-room')
-	async createRoomWithToken() {
+	async createRoomWithToken(@Req() req: any) {
+		const userId = req.user?.sub;
 		try {
 			const result = await this.whiteboardService.createRoom();
 			return result;
@@ -19,12 +22,15 @@ export class WhiteboardController {
 	}
 
 	/** Отдельный запрос для получения токена по UUID */
+	@UseGuards(JwtAuthGuard)
 	@Get('get-room-token')
 	async getRoomToken(
 		@Query('roomUuid') roomUuid: string,
 		@Query('role') role: 'admin' | 'writer' | 'reader',
-		@Query('lifespan') lifespan?: number,
+		@Req() req: any,
+		@Query('lifespan') lifespan?: number
 	) {
+		const userId = req.user?.sub;
 		if (!roomUuid || !role) {
 			return { error: 'roomUuid и role обязательны' };
 		}
@@ -33,8 +39,10 @@ export class WhiteboardController {
 	}
 
 	/** Получает App Identifier для whiteboard */
+	@UseGuards(JwtAuthGuard)
 	@Get('app-identifier')
-	async getAppIdentifier() {
+	async getAppIdentifier(@Req() req: any) {
+		const userId = req.user?.sub;
 		try {
 			const appIdentifier = this.whiteboardService.getAppIdentifier();
 			return { appIdentifier };
@@ -45,6 +53,7 @@ export class WhiteboardController {
 	}
 
 	/** Прокси для Agora API - получает конфигурацию регионов */
+	@UseGuards(JwtAuthGuard)
 	@Get('agora-proxy/*')
 	async agoraProxy(@Req() req: Request, @Res() res: Response) {
 		try {

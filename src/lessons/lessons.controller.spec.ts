@@ -68,7 +68,8 @@ describe('LessonsController', () => {
   describe('bookLesson', () => {
     it('should call service.bookLesson', () => {
       const body = { studentId: 's1', teacherId: 't1', scheduledAt: new Date().toISOString() };
-      controller.bookLesson(body);
+      const mockReq = { user: { sub: 's1' } };
+      controller.bookLesson(body, mockReq);
       expect(service.bookLesson).toHaveBeenCalledWith(body.studentId, body.teacherId, expect.any(Date));
     });
   });
@@ -91,36 +92,41 @@ describe('LessonsController', () => {
 
   describe('getUserLessons', () => {
     it('should call service.getLessonsForUser', () => {
-      controller.getUserLessons('u1');
+      const mockReq = { user: { sub: 'u1' } };
+      controller.getUserLessons(mockReq);
       expect(service.getLessonsForUser).toHaveBeenCalledWith('u1');
     });
   });
 
   describe('getConfirmedLessons', () => {
     it('should call service.getLessonsForStudent with status "confirmed"', async () => {
-      await controller.getConfirmedLessons('s1');
-      expect(service.getLessonsForStudent).toHaveBeenCalledWith('s1', 'confirmed');
+      const mockReq = { user: { sub: 's1' } };
+      await controller.getConfirmedLessons('s1', mockReq);
+      expect(service.getLessonsForStudent).toHaveBeenCalledWith('s1', 'confirmed', 's1');
     });
   });
 
   describe('getTeachersForStudent', () => {
     it('should call service.getTeachersForStudent', async () => {
-      await controller.getTeachersForStudent('s1');
-      expect(service.getTeachersForStudent).toHaveBeenCalledWith('s1');
+      const mockReq = { user: { sub: 's1' } };
+      await controller.getTeachersForStudent('s1', mockReq);
+      expect(service.getTeachersForStudent).toHaveBeenCalledWith('s1', 's1');
     });
   });
 
   describe('getStudentSentRequests', () => {
     it('should call service.getStudentSentRequests', async () => {
-      await controller.getStudentSentRequests('s1');
-      expect(service.getStudentSentRequests).toHaveBeenCalledWith('s1');
+      const mockReq = { user: { sub: 's1' } };
+      await controller.getStudentSentRequests('s1', mockReq);
+      expect(service.getStudentSentRequests).toHaveBeenCalledWith('s1', 's1');
     });
   });
 
   describe('getStudentSentRequestsPaged', () => {
     it('should call service.getStudentSentRequestsPaged', async () => {
-      await controller.getStudentSentRequestsPaged('s1', 2, 5);
-      expect(service.getStudentSentRequestsPaged).toHaveBeenCalledWith('s1', 2, 5);
+      const mockReq = { user: { sub: 's1' } };
+      await controller.getStudentSentRequestsPaged('s1', 2, 5, mockReq);
+      expect(service.getStudentSentRequestsPaged).toHaveBeenCalledWith('s1', 2, 5, 's1');
     });
   });
 

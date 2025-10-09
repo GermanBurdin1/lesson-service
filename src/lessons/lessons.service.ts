@@ -332,7 +332,11 @@ export class LessonsService {
 		});
 	}
 
-	async getLessonsForStudent(studentId: string, status: 'confirmed') {
+	async getLessonsForStudent(studentId: string, status: 'confirmed', currentUserId?: string) {
+		// Проверяем владение, если передан currentUserId
+		if (currentUserId && studentId !== currentUserId) {
+			throw new Error('Unauthorized: You can only view your own lessons');
+		}
 		const lessons = await this.lessonRepo.find({
 			where: { studentId },
 			order: { scheduledAt: 'ASC' }
@@ -370,7 +374,11 @@ export class LessonsService {
 		return withTeacherNames;
 	}
 
-	async getTeachersForStudent(studentId: string): Promise<any[]> {
+	async getTeachersForStudent(studentId: string, currentUserId?: string): Promise<any[]> {
+		// Проверяем владение, если передан currentUserId
+		if (currentUserId && studentId !== currentUserId) {
+			throw new Error('Unauthorized: You can only view your own teachers');
+		}
 		//console.log('[LessonsService] getTeachersForStudent called with studentId:', studentId);
 		const lessons = await this.lessonRepo.find({
 			where: [
@@ -1099,7 +1107,11 @@ export class LessonsService {
 
 	// ==================== ОТСЛЕЖИВАНИЕ ЗАЯВОК СТУДЕНТА ====================
 
-	async getStudentSentRequests(studentId: string) {
+	async getStudentSentRequests(studentId: string, currentUserId?: string) {
+		// Проверяем владение, если передан currentUserId
+		if (currentUserId && studentId !== currentUserId) {
+			throw new Error('Unauthorized: You can only view your own requests');
+		}
 		console.log(`📋 Получение отправленных заявок для студента ${studentId}`);
 
 		// Валидация UUID
@@ -1138,7 +1150,12 @@ export class LessonsService {
 		return enrichedLessons;
 	}
 
-	async getStudentSentRequestsPaged(studentId: string, page = 1, limit = 10) {
+	async getStudentSentRequestsPaged(studentId: string, page = 1, limit = 10, currentUserId?: string) {
+		// Проверяем владение, если передан currentUserId
+		if (currentUserId && studentId !== currentUserId) {
+			throw new Error('Unauthorized: You can only view your own requests');
+		}
+		
 		console.log(`📋 Получение отправленных заявок (paged) для студента ${studentId} (page=${page}, limit=${limit})`);
 
 		if (!this.validateUUID(studentId)) {
@@ -1685,7 +1702,12 @@ export class LessonsService {
 
 	// ==================== GROUP CLASSES METHODS ====================
 
-	async createGroupClass(createGroupClassDto: CreateGroupClassDto): Promise<GroupClass> {
+	async createGroupClass(createGroupClassDto: CreateGroupClassDto, currentUserId: string): Promise<GroupClass> {
+		// Проверяем, что пользователь создает группу для себя (если он преподаватель)
+		if (createGroupClassDto.teacherId !== currentUserId) {
+			throw new Error('Unauthorized: You can only create group classes for yourself');
+		}
+		
 		if (!this.validateUUID(createGroupClassDto.teacherId)) {
 			throw new Error('Invalid teacher ID format');
 		}
@@ -1702,7 +1724,12 @@ export class LessonsService {
 		return await this.groupClassRepo.save(groupClass);
 	}
 
-	async getTeacherGroupClasses(teacherId: string): Promise<GroupClass[]> {
+	async getTeacherGroupClasses(teacherId: string, currentUserId?: string): Promise<GroupClass[]> {
+		// Проверяем владение, если передан currentUserId
+		if (currentUserId && teacherId !== currentUserId) {
+			throw new Error('Unauthorized: You can only view your own group classes');
+		}
+		
 		if (!this.validateUUID(teacherId)) {
 			throw new Error('Invalid teacher ID format');
 		}
@@ -1714,7 +1741,12 @@ export class LessonsService {
 		});
 	}
 
-	async getStudentGroupClasses(studentId: string): Promise<GroupClass[]> {
+	async getStudentGroupClasses(studentId: string, currentUserId?: string): Promise<GroupClass[]> {
+		// Проверяем владение, если передан currentUserId
+		if (currentUserId && studentId !== currentUserId) {
+			throw new Error('Unauthorized: You can only view your own group classes');
+		}
+		
 		this.devLog(`[LESSON SERVICE] Getting group classes for student: ${studentId}`);
 		
 		if (!this.validateUUID(studentId)) {
@@ -1737,29 +1769,38 @@ export class LessonsService {
 		return classes;
 	}
 
-	async addStudentToClass(addStudentDto: AddStudentToClassDto): Promise<GroupClassStudent> {
+	async addStudentToClass(addStudentDto: AddStudentToClassDto, currentUserId: string): Promise<GroupClassStudent> {
 		console.log('🔥🔥🔥 [SERVICE] addStudentToClass вызван с данными:', addStudentDto);
+		
+		// Проверяем, что пользователь является преподавателем класса
+		const groupClass = await this.groupClassRepo.findOne({
+			where: { id: addStudentDto.groupClassId }
+		});
+		
+		if (!groupClass) {
+			throw new Error('Group class not found');
+		}
+		
+		if (groupClass.teacherId !== currentUserId) {
+			throw new Error('Unauthorized: You can only add students to your own classes');
+		}
 		
 		if (!this.validateUUIDs(addStudentDto.groupClassId, addStudentDto.studentId)) {
 			console.log('❌ [SERVICE] Неверный формат ID');
 			throw new Error('Invalid ID format');
 		}
 
-		// Проверяем, существует ли класс
+		// Получаем класс с отношениями для проверки студентов
 		console.log('🔍 [SERVICE] Ищем класс с ID:', addStudentDto.groupClassId);
-		const groupClass = await this.groupClassRepo.findOne({
+		const groupClassWithStudents = await this.groupClassRepo.findOne({
 			where: { id: addStudentDto.groupClassId },
 			relations: ['students']
 		});
 
-		if (!groupClass) {
-			console.log('❌ [SERVICE] Класс не найден!');
-			throw new Error('Group class not found');
-		}
-		console.log('✅ [SERVICE] Класс найден:', groupClass.name);
+		console.log('✅ [SERVICE] Класс найден:', groupClassWithStudents?.name);
 
 		// Проверяем, не превышен ли лимит студентов
-		if (groupClass.students.length >= groupClass.maxStudents) {
+		if (groupClassWithStudents.students.length >= groupClassWithStudents.maxStudents) {
 			throw new Error('Class is full');
 		}
 
@@ -1791,8 +1832,21 @@ export class LessonsService {
 		return savedStudent;
 	}
 
-	async removeStudentFromClass(groupClassId: string, studentId: string): Promise<void> {
+	async removeStudentFromClass(groupClassId: string, studentId: string, currentUserId: string): Promise<void> {
 		this.devLog(`[LESSON SERVICE] removeStudentFromClass called with classId: ${groupClassId}, studentId: ${studentId}`);
+		
+		// Проверяем, что пользователь является преподавателем класса
+		const groupClass = await this.groupClassRepo.findOne({
+			where: { id: groupClassId }
+		});
+		
+		if (!groupClass) {
+			throw new Error('Group class not found');
+		}
+		
+		if (groupClass.teacherId !== currentUserId) {
+			throw new Error('Unauthorized: You can only remove students from your own classes');
+		}
 		
 		if (!this.validateUUIDs(groupClassId, studentId)) {
 			this.devLog(`[LESSON SERVICE] Invalid UUID format`);
@@ -1821,21 +1875,44 @@ export class LessonsService {
 		this.devLog(`[LESSON SERVICE] Student removed from class successfully`);
 	}
 
-	async updateGroupClass(id: string, updateData: Partial<GroupClass>): Promise<GroupClass> {
+	async updateGroupClass(id: string, updateData: Partial<GroupClass>, currentUserId: string): Promise<GroupClass> {
+		// Проверяем, что пользователь является преподавателем класса
+		const existingClass = await this.groupClassRepo.findOne({
+			where: { id }
+		});
+		
+		if (!existingClass) {
+			throw new Error('Group class not found');
+		}
+		
+		if (existingClass.teacherId !== currentUserId) {
+			throw new Error('Unauthorized: You can only update your own classes');
+		}
+		
 		if (!this.validateUUID(id)) {
 			throw new Error('Invalid class ID format');
 		}
 
-		const groupClass = await this.groupClassRepo.findOne({ where: { id } });
-		if (!groupClass) {
-			throw new Error('Group class not found');
-		}
+		const groupClass = existingClass;
 
 		Object.assign(groupClass, updateData);
 		return await this.groupClassRepo.save(groupClass);
 	}
 
-	async deleteGroupClass(id: string): Promise<void> {
+	async deleteGroupClass(id: string, currentUserId: string): Promise<void> {
+		// Проверяем, что пользователь является преподавателем класса
+		const groupClass = await this.groupClassRepo.findOne({
+			where: { id }
+		});
+		
+		if (!groupClass) {
+			throw new Error('Group class not found');
+		}
+		
+		if (groupClass.teacherId !== currentUserId) {
+			throw new Error('Unauthorized: You can only delete your own classes');
+		}
+		
 		if (!this.validateUUID(id)) {
 			throw new Error('Invalid class ID format');
 		}
@@ -1897,7 +1974,12 @@ export class LessonsService {
 	/**
 	 * Добавить студента по email
 	 */
-	async addStudentByEmail(email: string, teacherId: string): Promise<{ success: boolean; message: string; studentId?: string; student?: any }> {
+	async addStudentByEmail(email: string, teacherId: string, currentUserId: string): Promise<{ success: boolean; message: string; studentId?: string; student?: any }> {
+		// Проверяем, что пользователь добавляет студента к себе
+		if (teacherId !== currentUserId) {
+			throw new Error('Unauthorized: You can only add students to your own classes');
+		}
+		
 		this.devLog(`[LESSON SERVICE] addStudentByEmail called with email: ${email}, teacherId: ${teacherId}`);
 		
 		try {

@@ -1,6 +1,6 @@
-import { Controller, Post, Body, Get, Query, Param, Logger, Put, UseGuards, Delete } from '@nestjs/common';
+import { Controller, Post, Body, Get, Query, Param, Logger, Put, UseGuards, Delete, Req } from '@nestjs/common';
 import { LessonsService } from './lessons.service';
-import { SimpleAuthGuard } from '../auth/simple-auth.guard';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { BookLessonDto } from '../dto/book-lesson.dto';
 import { CreateGroupClassDto } from '../dto/create-group-class.dto';
 import { UpdateGroupClassDto } from '../dto/update-group-class.dto';
@@ -10,9 +10,10 @@ import { AddStudentToClassDto } from '../dto/add-student-to-class.dto';
 export class LessonsController {
 	constructor(private readonly lessonsService: LessonsService) { }
 
-	@UseGuards(SimpleAuthGuard)
+	@UseGuards(JwtAuthGuard)
 	@Post('book')
-	bookLesson(@Body() bookLessonDto: BookLessonDto) {
+	bookLesson(@Body() bookLessonDto: BookLessonDto, @Req() req: any) {
+		const userId = req.user?.sub;
 		return this.lessonsService.bookLesson(
 			bookLessonDto.studentId, 
 			bookLessonDto.teacherId, 
@@ -42,39 +43,45 @@ export class LessonsController {
 	}
 
 	@Get()
-	getUserLessons(@Query('userId') userId: string) {
+	getUserLessons(@Req() req: any) {
+		const userId = req.user?.sub;
 		return this.lessonsService.getLessonsForUser(userId);
 	}
 
 	// ==================== СПЕЦИФИЧНЫЕ ENDPOINTS (должны быть ВЫШЕ общих) ====================
 
 	@Get('student/:id/confirmed-lessons')
-	async getConfirmedLessons(@Param('id') studentId: string) {
+	async getConfirmedLessons(@Param('id') studentId: string, @Req() req: any) {
+		const userId = req.user?.sub;
 		console.log(`📥 [GET] /student/${studentId}/confirmed-lessons reçu`);
-		return this.lessonsService.getLessonsForStudent(studentId, 'confirmed');
+		return this.lessonsService.getLessonsForStudent(studentId, 'confirmed', userId);
 	}
 
-	@UseGuards(SimpleAuthGuard)
+	@UseGuards(JwtAuthGuard)
 	@Get('student/:id/teachers')
-	async getTeachersForStudent(@Param('id') studentId: string) {
-		Logger.log(`[LessonsController] getTeachersForStudent вызван для studentId: ${studentId}`);
-		return this.lessonsService.getTeachersForStudent(studentId);
+	async getTeachersForStudent(@Param('id') studentId: string, @Req() req: any) {
+		const userId = req.user?.sub;
+		Logger.log(`[LessonsController] getTeachersForStudent вызван для studentId: ${studentId} пользователем: ${userId}`);
+		return this.lessonsService.getTeachersForStudent(studentId, userId);
 	}
 
 	@Get('student/:studentId/sent-requests')
-	async getStudentSentRequests(@Param('studentId') studentId: string) {
+	async getStudentSentRequests(@Param('studentId') studentId: string, @Req() req: any) {
+		const userId = req.user?.sub;
 		console.log(`📥 [GET] /student/:studentId/sent-requests получен для studentId: ${studentId}`);
-		return this.lessonsService.getStudentSentRequests(studentId);
+		return this.lessonsService.getStudentSentRequests(studentId, userId);
 	}
 
 	@Get('student/:studentId/sent-requests-paged')
 	async getStudentSentRequestsPaged(
 		@Param('studentId') studentId: string,
 		@Query('page') page: number = 1,
-		@Query('limit') limit: number = 10
+		@Query('limit') limit: number = 10,
+		@Req() req: any
 	) {
+		const userId = req.user?.sub;
 		console.log(`📥 [GET] /student/:studentId/sent-requests-paged получен для studentId: ${studentId}, page: ${page}, limit: ${limit}`);
-		return this.lessonsService.getStudentSentRequestsPaged(studentId, Number(page), Number(limit));
+		return this.lessonsService.getStudentSentRequestsPaged(studentId, page, limit, userId);
 	}
 
 	@Get('teacher/:teacherId/confirmed-students')
@@ -322,66 +329,76 @@ export class LessonsController {
 
 	// ==================== GROUP CLASSES ENDPOINTS ====================
 
-	@UseGuards(SimpleAuthGuard)
+	@UseGuards(JwtAuthGuard)
 	@Post('group-classes')
-	async createGroupClass(@Body() createGroupClassDto: CreateGroupClassDto) {
-		return this.lessonsService.createGroupClass(createGroupClassDto);
+	async createGroupClass(@Body() createGroupClassDto: CreateGroupClassDto, @Req() req: any) {
+		const userId = req.user?.sub;
+		return this.lessonsService.createGroupClass(createGroupClassDto, userId);
 	}
 
-	@UseGuards(SimpleAuthGuard)
+	@UseGuards(JwtAuthGuard)
 	@Get('group-classes/teacher/:teacherId')
-	async getTeacherGroupClasses(@Param('teacherId') teacherId: string) {
-		return this.lessonsService.getTeacherGroupClasses(teacherId);
+	async getTeacherGroupClasses(@Param('teacherId') teacherId: string, @Req() req: any) {
+		const userId = req.user?.sub;
+		return this.lessonsService.getTeacherGroupClasses(teacherId, userId);
 	}
 
-	@UseGuards(SimpleAuthGuard)
+	@UseGuards(JwtAuthGuard)
 	@Get('group-classes/student/:studentId')
-	async getStudentGroupClasses(@Param('studentId') studentId: string) {
-		return this.lessonsService.getStudentGroupClasses(studentId);
+	async getStudentGroupClasses(@Param('studentId') studentId: string, @Req() req: any) {
+		const userId = req.user?.sub;
+		return this.lessonsService.getStudentGroupClasses(studentId, userId);
 	}
 
-	@UseGuards(SimpleAuthGuard)
+	@UseGuards(JwtAuthGuard)
 	@Post('group-classes/students')
-	async addStudentToClass(@Body() addStudentDto: AddStudentToClassDto) {
-		console.log('🔥🔥🔥 [CONTROLLER] addStudentToClass вызван с данными:', addStudentDto);
-		return this.lessonsService.addStudentToClass(addStudentDto);
+	async addStudentToClass(@Body() addStudentDto: AddStudentToClassDto, @Req() req: any) {
+		const userId = req.user?.sub;
+		console.log('🔥🔥🔥 [CONTROLLER] addStudentToClass вызван с данными:', addStudentDto, 'пользователем:', userId);
+		return this.lessonsService.addStudentToClass(addStudentDto, userId);
 	}
 
-	@UseGuards(SimpleAuthGuard)
+	@UseGuards(JwtAuthGuard)
 	@Delete('group-classes/:classId/students/:studentId')
 	async removeStudentFromClass(
 		@Param('classId') classId: string,
-		@Param('studentId') studentId: string
+		@Param('studentId') studentId: string,
+		@Req() req: any
 	) {
-		return this.lessonsService.removeStudentFromClass(classId, studentId);
+		const userId = req.user?.sub;
+		return this.lessonsService.removeStudentFromClass(classId, studentId, userId);
 	}
 
-	@UseGuards(SimpleAuthGuard)
+	@UseGuards(JwtAuthGuard)
 	@Put('group-classes/:id')
 	async updateGroupClass(
 		@Param('id') id: string,
-		@Body() updateData: UpdateGroupClassDto
+		@Body() updateData: UpdateGroupClassDto,
+		@Req() req: any
 	) {
+		const userId = req.user?.sub;
 		// Преобразуем scheduledAt из string в Date, если оно присутствует
 		const processedData: any = { ...updateData };
 		if (updateData.scheduledAt) {
 			processedData.scheduledAt = new Date(updateData.scheduledAt);
 		}
 		
-		return this.lessonsService.updateGroupClass(id, processedData);
+		return this.lessonsService.updateGroupClass(id, processedData, userId);
 	}
 
-	@UseGuards(SimpleAuthGuard)
+	@UseGuards(JwtAuthGuard)
 	@Delete('group-classes/:id')
-	async deleteGroupClass(@Param('id') id: string) {
-		return this.lessonsService.deleteGroupClass(id);
+	async deleteGroupClass(@Param('id') id: string, @Req() req: any) {
+		const userId = req.user?.sub;
+		return this.lessonsService.deleteGroupClass(id, userId);
 	}
 
-	@UseGuards(SimpleAuthGuard)
+	@UseGuards(JwtAuthGuard)
 	@Post('add-student-by-email')
-	async addStudentByEmail(@Body() body: { email: string; teacherId: string }) {
-		console.log(`📧 [POST] /add-student-by-email reçu:`, body);
-		return this.lessonsService.addStudentByEmail(body.email, body.teacherId);
+	async addStudentByEmail(@Body() body: { email: string; teacherId: string }, @Req() req: any) {
+		const userId = req.user?.sub;
+		console.log(`📧 [POST] /add-student-by-email reçu:`, body, 'пользователем:', userId);
+		return this.lessonsService.addStudentByEmail(body.email, body.teacherId, userId);
 	}
 
 	@Get('student/by-email/:email')

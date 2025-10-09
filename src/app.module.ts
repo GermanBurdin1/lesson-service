@@ -18,6 +18,11 @@ import { LessonNotes } from './lessons/lesson-notes.entity';
 import { HomeworkItem } from './lessons/homework-item.entity';
 import { GroupClass } from './lessons/group-class.entity';
 import { GroupClassStudent } from './lessons/group-class-student.entity';
+import { JwtModule } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
+import { APP_GUARD } from '@nestjs/core';
+import { JwtStrategy } from './auth/jwt.strategy';
+import { JwtAuthGuard } from './auth/jwt-auth.guard';
 
 @Module({
 	imports: [
@@ -39,9 +44,24 @@ import { GroupClassStudent } from './lessons/group-class-student.entity';
 				synchronize: true,
 			}),
 		}),
+
+		PassportModule.register({ defaultStrategy: 'jwt' }),
+		JwtModule.register({
+			secret: process.env.JWT_SECRET,
+			verifyOptions: {
+				algorithms: ['HS256'],
+				issuer: process.env.JWT_ISS,
+			},
+		}),
+
 		LessonsModule
 	],
 	controllers: [WhiteboardController],
-	providers: [WhiteboardService],
+	providers: [
+		WhiteboardService,
+		JwtStrategy,
+		// Делаем guard глобальным для сервиса:
+		{ provide: APP_GUARD, useClass: JwtAuthGuard },
+	],
 })
 export class AppModule { }
