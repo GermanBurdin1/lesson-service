@@ -1,8 +1,9 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToMany, OneToOne } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToMany, OneToOne, JoinColumn, ManyToOne } from 'typeorm';
 import { Task } from './task.entity';
 import { Question } from './question.entity';
 import { LessonNotes } from './lesson-notes.entity';
 import { HomeworkItem } from './homework-item.entity';
+import { CourseEntity } from '../courses/course.entity';
 
 @Entity('lessons')
 export class Lesson {
@@ -71,4 +72,14 @@ export class Lesson {
 
   @OneToMany(() => HomeworkItem, homework => homework.lesson)
   homeworkItems: HomeworkItem[];
+
+	@ManyToOne(() => CourseEntity, (course) => course.lessons, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'courseId' })
+  course: CourseEntity | null;
+
+  @Column({ nullable: true })
+  courseId: number | null;
 }

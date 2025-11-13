@@ -6,6 +6,7 @@ import { LessonNotes } from './lessons/lesson-notes.entity';
 import { HomeworkItem } from './lessons/homework-item.entity';
 import { GroupClass } from './lessons/group-class.entity';
 import { GroupClassStudent } from './lessons/group-class-student.entity';
+import { CourseEntity } from './courses/course.entity';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -16,7 +17,7 @@ export const AppDataSource = new DataSource({
   database: 'db_lessons', // База данных как видно в pgAdmin
   synchronize: false,
   logging: true,
-  entities: [Lesson, Task, Question, LessonNotes, HomeworkItem, GroupClass, GroupClassStudent], // Добавлены новые entities
+  entities: [Lesson, Task, Question, LessonNotes, HomeworkItem, GroupClass, GroupClassStudent, CourseEntity],
   migrations: ['src/migrations/*.ts'],
   subscribers: [],
 });
