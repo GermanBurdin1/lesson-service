@@ -1256,7 +1256,8 @@ export class LessonsService {
 			originalItemId,
 			dueDate,
 			createdBy,
-			createdByRole
+			createdByRole,
+			isCourseTemplate: false // Обычное задание, не шаблон
 		});
 
 		const savedHomework = await this.homeworkRepo.save(homework);
@@ -1291,12 +1292,54 @@ export class LessonsService {
 		return savedHomework;
 	}
 
+	// Добавление шаблона домашнего задания для курса (без привязки к уроку/студенту)
+	async addCourseTemplateHomework(title: string, description: string | null, itemType: 'task' | 'question' | 'material', originalItemId: string | null, dueDate: Date, createdBy: string, sourceItemId?: string) {
+		console.log(`📚 [START] Добавление шаблона домашнего задания для курса (type=${itemType})`);
+
+		const homework = this.homeworkRepo.create({
+			lessonId: null, // Шаблоны не привязаны к уроку
+			title,
+			description,
+			itemType,
+			originalItemId: originalItemId || sourceItemId || null, // Сохраняем sourceItemId в originalItemId для связи с материалом/уроком курса
+			dueDate,
+			createdBy,
+			createdByRole: 'teacher',
+			isCourseTemplate: true // Помечаем как шаблон курса
+		});
+
+		const savedHomework = await this.homeworkRepo.save(homework);
+
+		// НЕ отправляем уведомления для шаблонов курсов
+		console.log(`✅ [END] Шаблон домашнего задания добавлен: ${savedHomework.id}`);
+		return savedHomework;
+	}
+
 	// Получение домашних заданий урока
 	async getHomeworkForLesson(lessonId: string) {
 		return this.homeworkRepo.find({
-			where: { lessonId },
+			where: { 
+				lessonId,
+				isCourseTemplate: false // Исключаем шаблоны курсов
+			},
 			order: { createdAt: 'ASC' }
 		});
+	}
+
+	// Получение шаблонов домашних заданий для курса по sourceItemId
+	async getCourseTemplateHomeworkBySourceItemId(sourceItemId: string): Promise<HomeworkItem[]> {
+		console.log(`📋 [SERVICE] getCourseTemplateHomeworkBySourceItemId вызван для sourceItemId: ${sourceItemId}`);
+		
+		const homework = await this.homeworkRepo.find({
+			where: {
+				isCourseTemplate: true,
+				originalItemId: sourceItemId // Используем originalItemId для поиска шаблонов курсов
+			},
+			order: { createdAt: 'ASC' }
+		});
+
+		console.log(`📋 [SERVICE] Найдено ${homework.length} шаблонов домашних заданий для sourceItemId: ${sourceItemId}`);
+		return homework;
 	}
 
 	// Получение всех домашних заданий студента
@@ -1316,7 +1359,10 @@ export class LessonsService {
 		}
 
 		const homework = await this.homeworkRepo.find({
-			where: { lessonId: In(lessonIds) },
+			where: { 
+				lessonId: In(lessonIds),
+				isCourseTemplate: false // Исключаем шаблоны курсов
+			},
 			order: { dueDate: 'ASC' },
 			relations: ['lesson']
 		});
@@ -1400,7 +1446,10 @@ export class LessonsService {
 		}
 
 		const homework = await this.homeworkRepo.find({
-			where: { lessonId: In(lessonIds) },
+			where: { 
+				lessonId: In(lessonIds),
+				isCourseTemplate: false // Исключаем шаблоны курсов
+			},
 			order: { dueDate: 'ASC' },
 			relations: ['lesson']
 		});
@@ -1535,12 +1584,20 @@ export class LessonsService {
 		});
 
 		// Если это связано с оригинальной задачей, отмечаем и её
+		// Проверяем, что originalItemId является валидным UUID (для обычных задач, не для шаблонов курсов)
 		if (homework.originalItemId && homework.itemType === 'task') {
-			const originalTask = await this.taskRepo.findOneBy({ id: homework.originalItemId });
-			if (originalTask) {
-				originalTask.isCompleted = true;
-				originalTask.completedAt = new Date();
-				await this.taskRepo.save(originalTask);
+			// Проверяем, является ли originalItemId валидным UUID
+			const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+			if (uuidRegex.test(homework.originalItemId)) {
+				const originalTask = await this.taskRepo.findOneBy({ id: homework.originalItemId });
+				if (originalTask) {
+					originalTask.isCompleted = true;
+					originalTask.completedAt = new Date();
+					await this.taskRepo.save(originalTask);
+				}
+			} else {
+				// originalItemId не является UUID (вероятно, это шаблон курса), пропускаем
+				console.log(`⚠️ [SERVICE] originalItemId "${homework.originalItemId}" не является UUID, пропускаем обновление задачи`);
 			}
 		}
 

@@ -245,6 +245,31 @@ export class LessonsController {
 
 	// ==================== ЭНДПОИНТЫ ДЛЯ ДОМАШНИХ ЗАДАНИЙ ====================
 
+	// Endpoint для создания шаблона домашнего задания для курса (должен быть ПЕРЕД :id/homework)
+	@Post('course-template/homework')
+	async addCourseTemplateHomework(
+		@Body() body: {
+			title: string;
+			description?: string | null;
+			itemType: 'task' | 'question' | 'material';
+			originalItemId?: string | null;
+			dueDate: string;
+			createdBy: string;
+			sourceItemId?: string;
+		}
+	) {
+		console.log(`📥 [POST] /course-template/homework получен:`, body);
+		return this.lessonsService.addCourseTemplateHomework(
+			body.title,
+			body.description || null,
+			body.itemType,
+			body.originalItemId || null,
+			new Date(body.dueDate),
+			body.createdBy,
+			body.sourceItemId
+		);
+	}
+
 	@Post(':id/homework')
 	async addHomeworkItem(
 		@Param('id') lessonId: string,
@@ -290,6 +315,23 @@ export class LessonsController {
 		const result = await this.lessonsService.getHomeworkForTeacher(teacherId);
 		console.log(`📋 [GET] /teacher/${teacherId}/homework результат:`, result.length, 'домашних заданий');
 		return result;
+	}
+
+	// Получение шаблонов домашних заданий для курса по sourceItemId
+	@Get('course-template/homework/:sourceItemId')
+	async getCourseTemplateHomeworkBySourceItemId(@Param('sourceItemId') sourceItemId: string) {
+		try {
+			// Декодируем sourceItemId на случай, если он содержит специальные символы
+			const decodedSourceItemId = decodeURIComponent(sourceItemId);
+			console.log(`📋 [GET] /course-template/homework/${decodedSourceItemId} вызван`);
+			const result = await this.lessonsService.getCourseTemplateHomeworkBySourceItemId(decodedSourceItemId);
+			console.log(`📋 [GET] /course-template/homework/${decodedSourceItemId} результат:`, result.length, 'шаблонов');
+			return result;
+		} catch (error) {
+			console.error(`❌ [GET] Ошибка при получении шаблонов домашних заданий для ${sourceItemId}:`, error);
+			// Возвращаем пустой массив при любой ошибке
+			return [];
+		}
 	}
 
 	@Put('homework/:homeworkId/complete')

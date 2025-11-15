@@ -30,6 +30,12 @@ export class CourseEntity {
   @Column({ default: false })
   isPublished: boolean;
 
+  @Column({ nullable: true })
+  coverImage: string | null;
+
+  @Column({ nullable: true, type: 'jsonb' })
+  sections: string[] | null;
+
   @OneToMany(() => Lesson, (lesson) => lesson.course)
   lessons: Lesson[];
 

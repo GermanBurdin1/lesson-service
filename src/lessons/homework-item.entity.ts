@@ -6,8 +6,8 @@ export class HomeworkItem {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column('uuid')
-  lessonId: string;
+  @Column('uuid', { nullable: true })
+  lessonId: string | null; // null для шаблонов курсов
 
   @Column('text')
   title: string;
@@ -18,8 +18,8 @@ export class HomeworkItem {
   @Column({ type: 'enum', enum: ['task', 'question', 'material'] })
   itemType: 'task' | 'question' | 'material';
 
-  @Column('uuid', { nullable: true })
-  originalItemId: string | null; // ID оригинального задания/вопроса/материала
+  @Column('text', { nullable: true })
+  originalItemId: string | null; // ID оригинального задания/вопроса/материала (может быть UUID или произвольная строка для шаблонов курсов)
 
   @Column('date')
   dueDate: Date;
@@ -29,6 +29,9 @@ export class HomeworkItem {
 
   @Column({ type: 'boolean', default: false })
   isCompleted: boolean;
+
+  @Column({ type: 'boolean', default: false })
+  isCourseTemplate: boolean; // true для шаблонов курсов (не привязаны к студенту/уроку)
 
   @Column('uuid')
   createdBy: string; // teacherId or studentId
@@ -54,7 +57,7 @@ export class HomeworkItem {
   @CreateDateColumn()
   createdAt: Date;
 
-  @ManyToOne(() => Lesson, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Lesson, { onDelete: 'CASCADE', nullable: true })
   @JoinColumn({ name: 'lessonId' })
-  lesson: Lesson;
+  lesson: Lesson | null;
 } 

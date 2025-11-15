@@ -9,6 +9,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { HttpModule } from '@nestjs/axios';
 import { LessonsModule } from './lessons/lessons.module';
+import { CoursesModule } from './courses/courses.module';
 import { WhiteboardController } from './whiteboard/whiteboard.controller';
 import { WhiteboardService } from './whiteboard/whiteboard.service';
 import { Lesson } from './lessons/lesson.entity';
@@ -18,6 +19,7 @@ import { LessonNotes } from './lessons/lesson-notes.entity';
 import { HomeworkItem } from './lessons/homework-item.entity';
 import { GroupClass } from './lessons/group-class.entity';
 import { GroupClassStudent } from './lessons/group-class-student.entity';
+import { CourseEntity } from './courses/course.entity';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { APP_GUARD } from '@nestjs/core';
@@ -39,7 +41,7 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
 				username: config.get<string>('DB_USERNAME'),
 				password: config.get<string>('DB_PASSWORD'),
 				database: config.get<string>('DB_NAME'),
-				entities: [Lesson, Task, Question, LessonNotes, HomeworkItem, GroupClass, GroupClassStudent],
+				entities: [Lesson, Task, Question, LessonNotes, HomeworkItem, GroupClass, GroupClassStudent, CourseEntity],
 				migrations: ['dist/migrations/*.js'],
 				synchronize: true,
 			}),
@@ -54,7 +56,8 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
 			},
 		}),
 
-		LessonsModule
+		LessonsModule,
+		CoursesModule
 	],
 	controllers: [WhiteboardController],
 	providers: [
