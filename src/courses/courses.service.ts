@@ -84,12 +84,14 @@ export class CoursesService {
       const lessonData: any = {
         name: lesson.name,
         type: lessonType,
-        description: lesson.description || undefined
+        description: lesson.description || undefined,
+        courseLessonId: lesson.id // Добавляем ID урока курса для фронтенда
       };
 
-      // Добавляем lessonId для типа 'call' из отдельной таблицы course_call_lesson_links
+      // Добавляем lessonId и plannedDurationMinutes для типа 'call' из отдельной таблицы course_call_lesson_links
       if (lessonType === 'call' && lesson.callLessonLink) {
         lessonData.lessonId = lesson.callLessonLink.lessonId;
+        lessonData.plannedDurationMinutes = lesson.callLessonLink.plannedDurationMinutes;
       }
 
       if (lesson.subSection) {
@@ -230,10 +232,46 @@ export class CoursesService {
         for (const linkData of callLessonLinksToCreate) {
           const savedLesson = savedLessons[linkData.courseLessonIndex];
           if (savedLesson) {
-            await this.courseCallLessonLinkRepository.save({
-              courseLessonId: savedLesson.id,
-              lessonId: linkData.lessonId,
+            // Проверяем, есть ли уже связь
+            let link = await this.courseCallLessonLinkRepository.findOne({
+              where: { courseLessonId: savedLesson.id },
             });
+            
+            if (link) {
+              // Обновляем существующую связь
+              link.lessonId = linkData.lessonId;
+              await this.courseCallLessonLinkRepository.save(link);
+            } else {
+              // Создаем новую связь
+              await this.courseCallLessonLinkRepository.save({
+                courseLessonId: savedLesson.id,
+                lessonId: linkData.lessonId,
+                plannedDurationMinutes: null,
+              });
+            }
+          }
+        }
+        
+        // Для всех call-уроков создаем связи даже если lessonId не указан (для шаблона)
+        for (let i = 0; i < savedLessons.length; i++) {
+          const savedLesson = savedLessons[i];
+          const originalLesson = lessonsToCreate[i];
+          
+          // Проверяем, что это call-урок
+          if (originalLesson.typeId === callType.id) {
+            // Проверяем, есть ли уже связь
+            const existingLink = await this.courseCallLessonLinkRepository.findOne({
+              where: { courseLessonId: savedLesson.id },
+            });
+            
+            if (!existingLink) {
+              // Создаем связь без lessonId (для шаблона курса)
+              await this.courseCallLessonLinkRepository.save({
+                courseLessonId: savedLesson.id,
+                lessonId: null,
+                plannedDurationMinutes: null,
+              });
+            }
           }
         }
       }
@@ -309,6 +347,27 @@ export class CoursesService {
     }
 
     return link.courseLesson;
+  }
+
+  async updateCallLessonSettings(courseLessonId: string, plannedDurationMinutes: number | null): Promise<CourseCallLessonLink | null> {
+    // Находим или создаем связь для урока курса
+    let link = await this.courseCallLessonLinkRepository.findOne({
+      where: { courseLessonId },
+    });
+
+    if (!link) {
+      // Создаем новую связь если её нет
+      link = this.courseCallLessonLinkRepository.create({
+        courseLessonId,
+        lessonId: null,
+        plannedDurationMinutes,
+      });
+    } else {
+      // Обновляем существующую связь
+      link.plannedDurationMinutes = plannedDurationMinutes;
+    }
+
+    return this.courseCallLessonLinkRepository.save(link);
   }
 }
 

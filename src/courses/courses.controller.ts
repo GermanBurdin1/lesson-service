@@ -114,5 +114,15 @@ export class CoursesController {
       body.coverImage || null,
     );
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Put('call-lesson/:courseLessonId/settings')
+  async updateCallLessonSettings(
+    @Param('courseLessonId') courseLessonId: string,
+    @Body() body: { plannedDurationMinutes: number | null }
+  ) {
+    this.logger.log(`Updating call lesson settings for courseLessonId: ${courseLessonId}`);
+    return this.coursesService.updateCallLessonSettings(courseLessonId, body.plannedDurationMinutes);
+  }
 }
 

@@ -23,16 +23,19 @@ export class CourseCallLessonLink {
   @Column({ type: 'uuid', unique: true })
   courseLessonId: string; // FK на course_lessons.id
 
-  @Column({ type: 'uuid' })
-  lessonId: string; // FK на lessons.id (реальный урок)
+  @Column({ type: 'uuid', nullable: true })
+  lessonId: string | null; // FK на lessons.id (реальный урок, может быть null для шаблона)
+
+  @Column({ type: 'integer', nullable: true })
+  plannedDurationMinutes: number | null; // Планируемая длительность занятия в минутах
 
   @OneToOne(() => CourseLesson, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'courseLessonId' })
   courseLesson: CourseLesson;
 
-  @ManyToOne(() => Lesson, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Lesson, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'lessonId' })
-  lesson: Lesson;
+  lesson: Lesson | null;
 
   @CreateDateColumn()
   createdAt: Date;
