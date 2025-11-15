@@ -349,7 +349,7 @@ export class CoursesService {
     return link.courseLesson;
   }
 
-  async updateCallLessonSettings(courseLessonId: string, plannedDurationMinutes: number | null): Promise<CourseCallLessonLink | null> {
+  async updateCallLessonSettings(courseLessonId: string, plannedDurationMinutes: number | null, description?: string | null): Promise<CourseCallLessonLink | null> {
     // Находим или создаем связь для урока курса
     let link = await this.courseCallLessonLinkRepository.findOne({
       where: { courseLessonId },
@@ -367,7 +367,19 @@ export class CoursesService {
       link.plannedDurationMinutes = plannedDurationMinutes;
     }
 
-    return this.courseCallLessonLinkRepository.save(link);
+    await this.courseCallLessonLinkRepository.save(link);
+
+    // Обновляем описание урока в CourseLesson
+    const courseLesson = await this.courseLessonRepository.findOne({
+      where: { id: courseLessonId },
+    });
+
+    if (courseLesson) {
+      courseLesson.description = description || null;
+      await this.courseLessonRepository.save(courseLesson);
+    }
+
+    return link;
   }
 }
 

@@ -119,10 +119,10 @@ export class CoursesController {
   @Put('call-lesson/:courseLessonId/settings')
   async updateCallLessonSettings(
     @Param('courseLessonId') courseLessonId: string,
-    @Body() body: { plannedDurationMinutes: number | null }
+    @Body() body: { plannedDurationMinutes: number | null; description?: string | null }
   ) {
     this.logger.log(`Updating call lesson settings for courseLessonId: ${courseLessonId}`);
-    return this.coursesService.updateCallLessonSettings(courseLessonId, body.plannedDurationMinutes);
+    return this.coursesService.updateCallLessonSettings(courseLessonId, body.plannedDurationMinutes, body.description);
   }
 }
 
