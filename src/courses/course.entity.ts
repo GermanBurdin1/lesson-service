@@ -7,6 +7,7 @@ import {
   OneToMany,
 } from 'typeorm';
 import { Lesson } from '../lessons/lesson.entity';
+import { CourseLesson } from './course-lesson.entity';
 
 @Entity('courses')
 export class CourseEntity {
@@ -36,8 +37,16 @@ export class CourseEntity {
   @Column({ nullable: true, type: 'jsonb' })
   sections: string[] | null;
 
+  @Column({ nullable: true, type: 'jsonb' })
+  subSections: { [key: string]: string[] } | null;
+
+  // Связь с реальными уроками (teacher-student lessons)
   @OneToMany(() => Lesson, (lesson) => lesson.course)
   lessons: Lesson[];
+
+  // Связь с уроками курса (course structure lessons)
+  @OneToMany(() => CourseLesson, (courseLesson) => courseLesson.course)
+  courseLessons: CourseLesson[];
 
   @CreateDateColumn()
   createdAt: Date;

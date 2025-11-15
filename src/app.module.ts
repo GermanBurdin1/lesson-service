@@ -20,6 +20,9 @@ import { HomeworkItem } from './lessons/homework-item.entity';
 import { GroupClass } from './lessons/group-class.entity';
 import { GroupClassStudent } from './lessons/group-class-student.entity';
 import { CourseEntity } from './courses/course.entity';
+import { CourseLesson } from './courses/course-lesson.entity';
+import { LessonType } from './courses/lesson-type.entity';
+import { CourseCallLessonLink } from './courses/course-call-lesson-link.entity';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { APP_GUARD } from '@nestjs/core';
@@ -41,7 +44,7 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
 				username: config.get<string>('DB_USERNAME'),
 				password: config.get<string>('DB_PASSWORD'),
 				database: config.get<string>('DB_NAME'),
-				entities: [Lesson, Task, Question, LessonNotes, HomeworkItem, GroupClass, GroupClassStudent, CourseEntity],
+				entities: [Lesson, Task, Question, LessonNotes, HomeworkItem, GroupClass, GroupClassStudent, CourseEntity, CourseLesson, LessonType, CourseCallLessonLink],
 				migrations: ['dist/migrations/*.js'],
 				synchronize: true,
 			}),

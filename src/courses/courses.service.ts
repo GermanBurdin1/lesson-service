@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { CourseEntity } from './course.entity';
+import { CourseLesson } from './course-lesson.entity';
+import { LessonType } from './lesson-type.entity';
+import { CourseCallLessonLink } from './course-call-lesson-link.entity';
 
 @Injectable()
 export class CoursesService {
@@ -10,7 +13,30 @@ export class CoursesService {
   constructor(
     @InjectRepository(CourseEntity)
     private readonly courseRepository: Repository<CourseEntity>,
+    @InjectRepository(CourseLesson)
+    private readonly courseLessonRepository: Repository<CourseLesson>,
+    @InjectRepository(LessonType)
+    private readonly lessonTypeRepository: Repository<LessonType>,
+    @InjectRepository(CourseCallLessonLink)
+    private readonly courseCallLessonLinkRepository: Repository<CourseCallLessonLink>,
   ) {}
+
+  /**
+   * Инициализирует типы уроков (вызывается при первом использовании)
+   */
+  private async ensureLessonTypes(): Promise<{ selfType: LessonType; callType: LessonType }> {
+    let selfType = await this.lessonTypeRepository.findOne({ where: { name: 'self' } });
+    if (!selfType) {
+      selfType = await this.lessonTypeRepository.save({ name: 'self', description: 'Самостоятельный урок' });
+    }
+
+    let callType = await this.lessonTypeRepository.findOne({ where: { name: 'call' } });
+    if (!callType) {
+      callType = await this.lessonTypeRepository.save({ name: 'call', description: 'Урок с созвоном' });
+    }
+
+    return { selfType, callType };
+  }
 
   async createCourse(
     title: string,
@@ -40,10 +66,53 @@ export class CoursesService {
   }
 
   async getCourseById(id: number): Promise<CourseEntity | null> {
-    return this.courseRepository.findOne({
+    const course = await this.courseRepository.findOne({
       where: { id },
-      relations: ['lessons'],
+      relations: ['courseLessons', 'courseLessons.type', 'courseLessons.callLessonLink', 'courseLessons.callLessonLink.lesson'],
     });
+    
+    if (!course) {
+      return null;
+    }
+
+    // Преобразуем courseLessons в старый формат для обратной совместимости
+    const lessons: { [key: string]: Array<{ name: string; type: 'self' | 'call'; description?: string; lessonId?: string }> } = {};
+    const lessonsInSubSections: { [section: string]: { [subSection: string]: Array<{ name: string; type: 'self' | 'call'; description?: string; lessonId?: string }> } } = {};
+
+    course.courseLessons.forEach(lesson => {
+      const lessonType = lesson.type.name as 'self' | 'call';
+      const lessonData: any = {
+        name: lesson.name,
+        type: lessonType,
+        description: lesson.description || undefined
+      };
+
+      // Добавляем lessonId для типа 'call' из отдельной таблицы course_call_lesson_links
+      if (lessonType === 'call' && lesson.callLessonLink) {
+        lessonData.lessonId = lesson.callLessonLink.lessonId;
+      }
+
+      if (lesson.subSection) {
+        if (!lessonsInSubSections[lesson.section]) {
+          lessonsInSubSections[lesson.section] = {};
+        }
+        if (!lessonsInSubSections[lesson.section][lesson.subSection]) {
+          lessonsInSubSections[lesson.section][lesson.subSection] = [];
+        }
+        lessonsInSubSections[lesson.section][lesson.subSection].push(lessonData);
+      } else {
+        if (!lessons[lesson.section]) {
+          lessons[lesson.section] = [];
+        }
+        lessons[lesson.section].push(lessonData);
+      }
+    });
+
+    // Добавляем преобразованные данные в курс для обратной совместимости
+    (course as any).lessons = Object.keys(lessons).length > 0 ? lessons : null;
+    (course as any).lessonsInSubSections = Object.keys(lessonsInSubSections).length > 0 ? lessonsInSubSections : null;
+
+    return course;
   }
 
   async updateCourse(
@@ -54,6 +123,9 @@ export class CoursesService {
     isPublished?: boolean,
     coverImage?: string | null,
     sections?: string[] | null,
+    subSections?: { [key: string]: string[] } | null,
+    lessons?: { [key: string]: Array<{ name: string; type: 'self' | 'call'; description?: string }> } | null,
+    lessonsInSubSections?: { [section: string]: { [subSection: string]: Array<{ name: string; type: 'self' | 'call'; description?: string }> } } | null,
   ): Promise<CourseEntity | null> {
     const course = await this.courseRepository.findOne({ where: { id } });
     if (!course) {
@@ -66,13 +138,177 @@ export class CoursesService {
     if (isPublished !== undefined) course.isPublished = isPublished;
     if (coverImage !== undefined) course.coverImage = coverImage;
     if (sections !== undefined) course.sections = sections;
+    if (subSections !== undefined) course.subSections = subSections;
 
-    return this.courseRepository.save(course);
+    // Сохраняем курс
+    const savedCourse = await this.courseRepository.save(course);
+
+    // Обновляем уроки курса в таблице course_lessons
+    if (lessons !== undefined || lessonsInSubSections !== undefined) {
+      // Получаем типы уроков (инициализируем если нужно)
+      const { selfType, callType } = await this.ensureLessonTypes();
+
+      // Удаляем старые связи call-уроков
+      const oldLessons = await this.courseLessonRepository.find({
+        where: { courseId: id },
+        relations: ['callLessonLink'],
+      });
+      for (const oldLesson of oldLessons) {
+        if (oldLesson.callLessonLink) {
+          await this.courseCallLessonLinkRepository.delete({ id: oldLesson.callLessonLink.id });
+        }
+      }
+
+      // Удаляем старые уроки
+      await this.courseLessonRepository.delete({ courseId: id });
+
+      // Создаем новые уроки
+      const lessonsToCreate: CourseLesson[] = [];
+      const callLessonLinksToCreate: Array<{ courseLessonIndex: number; lessonId: string }> = [];
+
+      // Обрабатываем уроки на уровне секций
+      if (lessons) {
+        Object.keys(lessons).forEach(section => {
+          lessons[section].forEach((lesson, index) => {
+            const typeId = lesson.type === 'self' ? selfType.id : callType.id;
+            const courseLesson = this.courseLessonRepository.create({
+              courseId: id,
+              section: section,
+              subSection: null,
+              name: lesson.name,
+              typeId: typeId,
+              description: lesson.description || null,
+              orderIndex: index,
+            });
+            lessonsToCreate.push(courseLesson);
+
+            // Для типа 'call' запоминаем индекс для создания связи
+            if (lesson.type === 'call' && (lesson as any).lessonId) {
+              callLessonLinksToCreate.push({
+                courseLessonIndex: lessonsToCreate.length - 1,
+                lessonId: (lesson as any).lessonId,
+              });
+            }
+          });
+        });
+      }
+
+      // Обрабатываем уроки в подсекциях
+      if (lessonsInSubSections) {
+        Object.keys(lessonsInSubSections).forEach(section => {
+          Object.keys(lessonsInSubSections[section]).forEach(subSection => {
+            lessonsInSubSections[section][subSection].forEach((lesson, index) => {
+              const typeId = lesson.type === 'self' ? selfType.id : callType.id;
+              const courseLesson = this.courseLessonRepository.create({
+                courseId: id,
+                section: section,
+                subSection: subSection,
+                name: lesson.name,
+                typeId: typeId,
+                description: lesson.description || null,
+                orderIndex: index,
+              });
+              lessonsToCreate.push(courseLesson);
+
+              // Для типа 'call' запоминаем индекс для создания связи
+              if (lesson.type === 'call' && (lesson as any).lessonId) {
+                callLessonLinksToCreate.push({
+                  courseLessonIndex: lessonsToCreate.length - 1,
+                  lessonId: (lesson as any).lessonId,
+                });
+              }
+            });
+          });
+        });
+      }
+
+      // Сохраняем все уроки
+      if (lessonsToCreate.length > 0) {
+        const savedLessons = await this.courseLessonRepository.save(lessonsToCreate);
+        
+        // Сохраняем связи для call-уроков в отдельной таблице
+        for (const linkData of callLessonLinksToCreate) {
+          const savedLesson = savedLessons[linkData.courseLessonIndex];
+          if (savedLesson) {
+            await this.courseCallLessonLinkRepository.save({
+              courseLessonId: savedLesson.id,
+              lessonId: linkData.lessonId,
+            });
+          }
+        }
+      }
+    }
+
+    // Возвращаем курс с загруженными уроками
+    return this.getCourseById(id);
   }
 
   async deleteCourse(id: number): Promise<boolean> {
     const result = await this.courseRepository.delete(id);
     return result.affected !== undefined && result.affected > 0;
+  }
+
+  /**
+   * Обновляет lessonId для урока курса типа 'call' после создания реального урока
+   * Урок типа 'call' - это ссылка на существующий урок из таблицы lessons
+   * Связь хранится в отдельной таблице course_call_lesson_links
+   * @param courseLessonId ID урока курса из таблицы course_lessons
+   * @param lessonId ID реального урока из таблицы lessons
+   */
+  async linkCallLessonToRealLesson(courseLessonId: string, lessonId: string): Promise<CourseLesson | null> {
+    const courseLesson = await this.courseLessonRepository.findOne({
+      where: { id: courseLessonId },
+      relations: ['type'],
+    });
+
+    if (!courseLesson) {
+      return null;
+    }
+
+    // Проверяем, что урок имеет тип 'call'
+    if (courseLesson.type.name !== 'call') {
+      throw new Error('Можно связать только уроки типа "call" с реальными уроками из таблицы lessons');
+    }
+
+    // Проверяем, есть ли уже связь
+    let link = await this.courseCallLessonLinkRepository.findOne({
+      where: { courseLessonId },
+    });
+
+    if (link) {
+      // Обновляем существующую связь
+      link.lessonId = lessonId;
+      await this.courseCallLessonLinkRepository.save(link);
+    } else {
+      // Создаем новую связь
+      link = this.courseCallLessonLinkRepository.create({
+        courseLessonId,
+        lessonId,
+      });
+      await this.courseCallLessonLinkRepository.save(link);
+    }
+
+    return this.courseLessonRepository.findOne({
+      where: { id: courseLessonId },
+      relations: ['type', 'callLessonLink'],
+    });
+  }
+
+  /**
+   * Находит урок курса типа 'call' по courseId и lessonId из таблицы lessons
+   * Используется для автоматической связи при создании урока
+   */
+  async findCourseLessonByRealLessonId(courseId: number, lessonId: string): Promise<CourseLesson | null> {
+    const link = await this.courseCallLessonLinkRepository.findOne({
+      where: { lessonId },
+      relations: ['courseLesson'],
+    });
+
+    if (!link || link.courseLesson.courseId !== courseId) {
+      return null;
+    }
+
+    return link.courseLesson;
   }
 }
 

@@ -70,6 +70,9 @@ export class CoursesController {
       isPublished?: boolean;
       coverImage?: string;
       sections?: string[];
+      subSections?: { [key: string]: string[] };
+      lessons?: { [key: string]: Array<{ name: string; type: 'self' | 'call'; description?: string }> };
+      lessonsInSubSections?: { [section: string]: { [subSection: string]: Array<{ name: string; type: 'self' | 'call'; description?: string }> } };
     },
   ) {
     const courseId = parseInt(id, 10);
@@ -81,6 +84,9 @@ export class CoursesController {
       body.isPublished,
       body.coverImage,
       body.sections,
+      body.subSections,
+      body.lessons,
+      body.lessonsInSubSections,
     );
   }
 
