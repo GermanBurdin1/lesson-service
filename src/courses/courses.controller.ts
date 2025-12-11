@@ -28,6 +28,11 @@ export class CoursesController {
       description?: string;
       level?: string;
       isPublished?: boolean;
+      isFree?: boolean;
+      price?: number | null;
+      currency?: string | null;
+      paymentMethod?: string | null;
+      paymentDescription?: string | null;
     },
     @Req() req: any,
   ) {
@@ -40,6 +45,11 @@ export class CoursesController {
       body.level || null,
       teacherId,
       body.isPublished || false,
+      body.isFree !== undefined ? body.isFree : true,
+      body.price !== undefined ? body.price : null,
+      body.currency || null,
+      body.paymentMethod || null,
+      body.paymentDescription || null,
     );
   }
 
@@ -73,6 +83,11 @@ export class CoursesController {
       subSections?: { [key: string]: string[] };
       lessons?: { [key: string]: Array<{ name: string; type: 'self' | 'call'; description?: string }> };
       lessonsInSubSections?: { [section: string]: { [subSection: string]: Array<{ name: string; type: 'self' | 'call'; description?: string }> } };
+      isFree?: boolean;
+      price?: number | null;
+      currency?: string | null;
+      paymentMethod?: string | null;
+      paymentDescription?: string | null;
     },
   ) {
     const courseId = parseInt(id, 10);
@@ -87,6 +102,11 @@ export class CoursesController {
       body.subSections,
       body.lessons,
       body.lessonsInSubSections,
+      body.isFree,
+      body.price,
+      body.currency,
+      body.paymentMethod,
+      body.paymentDescription,
     );
   }
 

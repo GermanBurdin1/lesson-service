@@ -44,6 +44,11 @@ export class CoursesService {
     level: string | null,
     teacherId: string,
     isPublished: boolean = false,
+    isFree: boolean = true,
+    price: number | null = null,
+    currency: string | null = null,
+    paymentMethod: string | null = null,
+    paymentDescription: string | null = null,
   ): Promise<CourseEntity> {
     const course = this.courseRepository.create({
       title,
@@ -51,6 +56,11 @@ export class CoursesService {
       level,
       teacherId,
       isPublished,
+      isFree,
+      price,
+      currency,
+      paymentMethod,
+      paymentDescription,
     });
 
     const savedCourse = await this.courseRepository.save(course);
@@ -128,6 +138,11 @@ export class CoursesService {
     subSections?: { [key: string]: string[] } | null,
     lessons?: { [key: string]: Array<{ name: string; type: 'self' | 'call'; description?: string }> } | null,
     lessonsInSubSections?: { [section: string]: { [subSection: string]: Array<{ name: string; type: 'self' | 'call'; description?: string }> } } | null,
+    isFree?: boolean,
+    price?: number | null,
+    currency?: string | null,
+    paymentMethod?: string | null,
+    paymentDescription?: string | null,
   ): Promise<CourseEntity | null> {
     const course = await this.courseRepository.findOne({ where: { id } });
     if (!course) {
@@ -141,6 +156,11 @@ export class CoursesService {
     if (coverImage !== undefined) course.coverImage = coverImage;
     if (sections !== undefined) course.sections = sections;
     if (subSections !== undefined) course.subSections = subSections;
+    if (isFree !== undefined) course.isFree = isFree;
+    if (price !== undefined) course.price = price;
+    if (currency !== undefined) course.currency = currency;
+    if (paymentMethod !== undefined) course.paymentMethod = paymentMethod;
+    if (paymentDescription !== undefined) course.paymentDescription = paymentDescription;
 
     // Сохраняем курс
     const savedCourse = await this.courseRepository.save(course);

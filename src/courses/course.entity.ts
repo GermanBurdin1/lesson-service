@@ -40,6 +40,22 @@ export class CourseEntity {
   @Column({ nullable: true, type: 'jsonb' })
   subSections: { [key: string]: string[] } | null;
 
+  // Поля для платных курсов
+  @Column({ default: true })
+  isFree: boolean;
+
+  @Column({ nullable: true, type: 'decimal', precision: 10, scale: 2 })
+  price: number | null;
+
+  @Column({ nullable: true })
+  currency: string | null;
+
+  @Column({ nullable: true })
+  paymentMethod: string | null;
+
+  @Column({ nullable: true, type: 'text' })
+  paymentDescription: string | null;
+
   // Связь с реальными уроками (teacher-student lessons)
   @OneToMany(() => Lesson, (lesson) => lesson.course)
   lessons: Lesson[];
